@@ -12,7 +12,7 @@
 
 
 ifneq ($(KERNELRELEASE),)
-	obj-m := main.o
+	obj-m := pio.o
 else
 	KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 	PWD := $(shell pwd)
