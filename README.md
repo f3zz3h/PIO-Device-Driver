@@ -25,7 +25,15 @@ To unload when you are finished
 
 
 =============
-Source Website
+Source Website for Skeleton Driver
 =============
 
 http://matthias.vallentin.net/blog/2007/04/writing-a-linux-kernel-driver-for-an-unknown-usb-device/
+
+============
+Useful sites
+============
+A Small TTY Driver
+
+    http://www.makelinux.net/ldd3/chp-18-sect-1
+
