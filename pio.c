@@ -8,15 +8,15 @@
 #include <linux/tty_driver.h>
 #include <linux/tty_flip.h>
 #include <asm/uaccess.h>		/* copy_*_user */
+#include <linux/kernel.h>
 
 #include "pio.h"
 
 /* Not sure we need the below
-#include <linux/kernel.h>
+
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/serial.h>
-#include <linux/module.h>
 #include <linux/usb.h>
 #include <linux/usb/cdc.h>
 #include <asm/byteorder.h>
@@ -102,6 +102,20 @@ static int pio_open(struct inode *inode, struct file *file)
 {
 	return NULL;
 }
+static int pio_close(struct inode *inode, struct file *file)
+{
+	return NULL;
+}
+static int pio_set_termios(struct inode *inode, struct file *file)
+{
+	return NULL;
+}
+static int pio_write_room(struct inode *inode, struct file *file)
+{
+	return NULL;
+}
+
+
 
 static int pio_release(struct inode *inode, struct file *file)
 {
@@ -113,9 +127,6 @@ static ssize_t pio_write(struct file *file, const char __user *user_buf, size_t
 {
 	return NULL;
 }
-
-
-
 
 
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
@@ -236,7 +247,7 @@ static int __init usb_pio_init(void)
 	acm_tty_driver->init_termios = tty_std_termios;
 	acm_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD |
 								HUPCL | CLOCAL;
-	tty_set_operations(acm_tty_driver, &acm_ops);
+	tty_set_operations(acm_tty_driver, &pio_ops);
 
 	retval = tty_register_driver(acm_tty_driver);
 	if (retval) {
@@ -251,8 +262,7 @@ static int __init usb_pio_init(void)
 		return retval;
 	}
 
-	printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_VERSION ":"
-	       DRIVER_DESC "\n");
+	printk(KERN_INFO KBUILD_MODNAME ": Driver version could go here! \n");
 
 	return 0;
 

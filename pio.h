@@ -86,6 +86,8 @@ static struct usb_device_id pio_table[] = {
 	{ }
 };
 
+static struct tty_driver *acm_tty_driver;
+
 
 
 
@@ -100,6 +102,9 @@ static int pio_release(struct inode *inode, struct file *file);
 static ssize_t pio_write(struct file *file, const char __user *user_buf, size_t count, loff_t *ppos);
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id);
 static void pio_disconnect(struct usb_interface *interface);
+static int pio_close(struct inode *inode, struct file *file);
+static int pio_set_termios(struct inode *inode, struct file *file);
+static int pio_write_room(struct inode *inode, struct file *file);
 
 
 /* Structs that require functions */
@@ -123,3 +128,13 @@ static struct usb_class_driver pio_class = {
 	//.minor_base = PIO_MINOR_BASE,
 };
 
+/*
+ * TTY driver structures.
+ */
+static const struct tty_operations pio_ops = {
+	.open = pio_open,
+	.close = pio_close,
+	.write = pio_write,
+	.write_room = pio_write_room,
+	.set_termios = pio_set_termios,
+};
