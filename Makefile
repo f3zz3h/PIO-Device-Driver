@@ -20,5 +20,5 @@ default:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 clean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
-	rm *.symvers
+
 endif
