@@ -1,1 +1,0 @@
-cmd_/home/luke/DWD/PIO-Device-Driver/main.ko := ld -r -m elf_x86_64 -T /usr/src/linux-headers-3.2.0-58-generic/scripts/module-common.lds --build-id  -o /home/luke/DWD/PIO-Device-Driver/main.ko /home/luke/DWD/PIO-Device-Driver/main.o /home/luke/DWD/PIO-Device-Driver/main.mod.o
