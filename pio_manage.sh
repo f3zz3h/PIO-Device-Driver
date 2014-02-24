@@ -1,6 +1,6 @@
 #!/bin/sh
 cdc="cdc_acm"
-module="pio_driver"
+module="pio"
 devname="usb_device"
 device="pio"
 mode=664
