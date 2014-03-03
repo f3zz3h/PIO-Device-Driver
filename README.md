@@ -37,3 +37,5 @@ A Small TTY Driver
 
     http://www.makelinux.net/ldd3/chp-18-sect-1
 
+
+    http://www.beyondlogic.org/usbnutshell/usb1.shtml
