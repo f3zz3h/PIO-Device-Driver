@@ -34,6 +34,16 @@ usb 5-2: SerialNumber: 012531
 usb 5-2: configuration #1 chosen from 1 choice
 cdc_acm 5-2:1.0: ttyACM0: USB ACM device
 
+
+cat /proc/tty/drivers
+acm   /dev/ttyACM   166 0-31 serial
+
+tree /sys/class/tty
+ttyACM0 -> ../../devices/pci0000:00/0000:00:1d.0/usb6/6-2/6-2:1.0/tty/ttyACM0
+
+cat /sys/class/tty/ttyACM0/dev
+166:0
+
 */
 
 
@@ -93,8 +103,6 @@ static void pio_int_in_callback(struct urb *urb)
 {
 	struct usb_pio *dev = urb->context;
 	int retval;
-
-	return NULL; 
 }
 
 
@@ -152,8 +160,6 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 		retval = -ENOMEM;
 		goto exit;
 	}
-
-	//dev->command = PIO_STOP;
 
 	init_MUTEX(&dev->sem);
 	spin_lock_init(&dev->cmd_spinlock);
@@ -233,32 +239,32 @@ static void pio_disconnect(struct usb_interface *interface)
 static int __init usb_pio_init(void)
 {
 	int retval;
-	acm_tty_driver = alloc_tty_driver(ACM_TTY_MINORS);
-	if (!acm_tty_driver)
+	pio_tty_driver = alloc_tty_driver(ACM_TTY_MINORS);
+	if (!pio_tty_driver)
 		return -ENOMEM;
-	acm_tty_driver->owner = THIS_MODULE,
-	acm_tty_driver->driver_name = "acm",
-	acm_tty_driver->name = "ttyACM",
-	acm_tty_driver->major = ACM_TTY_MAJOR,
-	acm_tty_driver->minor_start = 0,
-	acm_tty_driver->type = TTY_DRIVER_TYPE_SERIAL,
-	acm_tty_driver->subtype = SERIAL_TYPE_NORMAL,
-	acm_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
-	acm_tty_driver->init_termios = tty_std_termios;
-	acm_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD |
+	pio_tty_driver->owner = THIS_MODULE,
+	pio_tty_driver->driver_name = "acm",
+	pio_tty_driver->name = "ttyACM",
+	pio_tty_driver->major = ACM_TTY_MAJOR,
+	pio_tty_driver->minor_start = 0,
+	pio_tty_driver->type = TTY_DRIVER_TYPE_SERIAL,
+	pio_tty_driver->subtype = SERIAL_TYPE_NORMAL,
+	pio_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
+	pio_tty_driver->init_termios = tty_std_termios;
+	pio_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD |
 								HUPCL | CLOCAL;
-	tty_set_operations(acm_tty_driver, &pio_ops);
+	tty_set_operations(pio_tty_driver, &pio_ops);
 
-	retval = tty_register_driver(acm_tty_driver);
+	retval = tty_register_driver(pio_tty_driver);
 	if (retval) {
-		put_tty_driver(acm_tty_driver);
+		put_tty_driver(pio_tty_driver);
 		return retval;
 	}
 
 	retval = usb_register(&pio_driver);
 	if (retval) {
-		tty_unregister_driver(acm_tty_driver);
-		put_tty_driver(acm_tty_driver);
+		tty_unregister_driver(pio_tty_driver);
+		put_tty_driver(pio_tty_driver);
 		return retval;
 	}
 
@@ -272,8 +278,8 @@ static int __init usb_pio_init(void)
 static void __exit usb_pio_exit(void)
 {
 	usb_deregister(&pio_driver);
-	tty_unregister_driver(acm_tty_driver);
-	put_tty_driver(acm_tty_driver);	
+	tty_unregister_driver(pio_tty_driver);
+	put_tty_driver(pio_tty_driver);	
 	DBG_INFO("Module deregistered");
 }
 

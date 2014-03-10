@@ -86,13 +86,9 @@ static struct usb_device_id pio_table[] = {
 	{ }
 };
 
-static struct tty_driver *acm_tty_driver;
-
-
-
+static struct tty_driver *pio_tty_driver;
 
 /* Function declareations */
-
 static void pio_abort_transfers(struct usb_pio *dev);
 static inline void pio_delete(struct usb_pio *dev);
 static void pio_ctrl_callback(struct urb *urb);
