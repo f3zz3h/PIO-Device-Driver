@@ -177,7 +177,7 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 
 		if (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN)
 			&& ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
-			    USB_ENDPOINT_XFER_BULK))
+			    USB_ENDPOINT_XFER_INT))
 		    dev->int_in_endpoint = endpoint;
 
 	}
@@ -211,6 +211,11 @@ static void pio_disconnect(struct usb_interface *interface)
 	mutex_lock(&disconnect_mutex);	/* Not interruptible */
 
 	dev = usb_get_intfdata(interface);
+
+	if(!dev)
+	{
+		return;
+	}
 	usb_set_intfdata(interface, NULL);
 
 	down(&dev->sem); /* Not interruptible */
@@ -236,36 +241,14 @@ static void pio_disconnect(struct usb_interface *interface)
 
 
 /* called on module loading 
-	currently a copy of cdc-acm needs some changes adding
 */
 static int __init usb_pio_init(void)
 {
 	int retval;
-	pio_tty_driver = alloc_tty_driver(ACM_TTY_MINORS);
-	if (!pio_tty_driver)
-		return -ENOMEM;
-	pio_tty_driver->owner = THIS_MODULE,
-	pio_tty_driver->driver_name = "acm",
-	pio_tty_driver->name = "ttyACM",
-	pio_tty_driver->major = ACM_TTY_MAJOR,
-	pio_tty_driver->minor_start = 0,
-	pio_tty_driver->type = TTY_DRIVER_TYPE_SERIAL,
-	pio_tty_driver->subtype = SERIAL_TYPE_NORMAL,
-	pio_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
-	pio_tty_driver->init_termios = tty_std_termios;
-	pio_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD |
-								HUPCL | CLOCAL;
-	tty_set_operations(pio_tty_driver, &pio_ops);
-
-	retval = tty_register_driver(pio_tty_driver);
-	if (retval) {
-		put_tty_driver(pio_tty_driver);
-		return retval;
-	}
 
 	retval = usb_register(&pio_driver);
+
 	if (retval) {
-		tty_unregister_driver(pio_tty_driver);
 		put_tty_driver(pio_tty_driver);
 		return retval;
 	}
@@ -280,8 +263,7 @@ static int __init usb_pio_init(void)
 static void __exit usb_pio_exit(void)
 {
 	usb_deregister(&pio_driver);
-	tty_unregister_driver(pio_tty_driver);
-	put_tty_driver(pio_tty_driver);	
+
 	DBG_INFO("Module deregistered");
 }
 

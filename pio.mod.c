@@ -21,18 +21,13 @@ __attribute__((section("__versions"))) = {
 	{ 0x3ec8886f, "param_ops_int" },
 	{ 0xcd466ac0, "usb_deregister" },
 	{ 0xbcf01c62, "put_tty_driver" },
-	{ 0x5ff32c45, "tty_unregister_driver" },
 	{ 0x9df96cd7, "usb_register_driver" },
-	{ 0x2269ac4e, "tty_register_driver" },
-	{ 0x6de651b, "tty_set_operations" },
-	{ 0x67b27ec1, "tty_std_termios" },
-	{ 0x3a410a75, "alloc_tty_driver" },
 	{ 0x5b453d9c, "usb_register_dev" },
 	{ 0x399c29ef, "kmem_cache_alloc_trace" },
 	{ 0x62eb2c87, "kmalloc_caches" },
+	{ 0x4dbf39e0, "mutex_unlock" },
 	{ 0x37a0cba, "kfree" },
 	{ 0x70f9a21, "usb_free_urb" },
-	{ 0x4dbf39e0, "mutex_unlock" },
 	{ 0x71e3cecb, "up" },
 	{ 0xafec1e42, "usb_deregister_dev" },
 	{ 0x68aca4ad, "down" },
@@ -51,4 +46,4 @@ __attribute__((section(".modinfo"))) =
 
 MODULE_ALIAS("usb:v09CAp5544d*dc*dsc*dp*ic*isc*ip*");
 
-MODULE_INFO(srcversion, "30192C86E90B747C3B6DAEA");
+MODULE_INFO(srcversion, "2234A5DD5D5962EBF376B09");
