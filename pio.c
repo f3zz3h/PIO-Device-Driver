@@ -146,6 +146,8 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 	int i, int_end_size;
 	int retval = -ENODEV;
 
+	printk("PROBING!! :p \n");
+
 	if (! udev)
 	{
 		//DBG_ERR("udev is NULL");
@@ -175,7 +177,7 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 
 		if (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN)
 			&& ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
-			    USB_ENDPOINT_XFER_INT))
+			    USB_ENDPOINT_XFER_BULK))
 		    dev->int_in_endpoint = endpoint;
 
 	}

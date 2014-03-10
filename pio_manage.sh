@@ -30,7 +30,7 @@ unload()
 	rmmod ${module} || exit 1
 	rm -f /dev/${device}[0-3]
 }
-cdcunload()
+cdc_unload()
 {	
 	rmmod ${cdc} || exit 1
 }
@@ -48,9 +48,9 @@ case $1 in
 	load $*
 	;;
 	cdcunload)
-	unload_cdc
+	cdc_unload
 	;;
 	*)
-	echo "usage: $0 <load|unload|reload>"
+	echo "usage: $0 <load|unload|cdcunload|reload>"
 	;;
 esac
