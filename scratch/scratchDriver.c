@@ -191,11 +191,7 @@ static struct usb_endpoint_descriptor *set_endpoint(struct usb_endpoint_descript
 	  printk(KERN_INFO KBUILD_MODNAME": interrup endpoint found!\n");
 	  return endpoint;
 	}
-<<<<<<< Updated upstream
 	return NULL;
-=======
-        return NULL;
->>>>>>> Stashed changes
 }
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
@@ -285,13 +281,9 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 		//DBG_ERR("could not find interupt endpoint");
 		goto error;
 	}
-<<<<<<< Updated upstream
 
-  /* ..... */
-  usb_set_intfdata(interface, dev);
-
-=======
 //setup control line
+	/*//not ready for the stage, still shy
   dev->ctrl_urb = initialise_urb(&urb_err);
   dev->ctrl_buffer = initialise_urb_buffer(PIO_CTRL_BUFFER_SIZE, &buffer_err);
   dev->ctrl_dr = initialise_urb_buffer(sizeof (struct usb_ctrlrequest ), &buffer_err);
@@ -305,7 +297,7 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
       retval = -ENOMEM;
       goto error;
     }
-/*//not ready for the stage, still shy
+
   dev->ctrl_dr->bRequestType = PIO_CTRL_REQUEST_TYPE;
   dev->ctrl_dr->bResquest = PIO_CTRL_REQUEST;
   dev->ctrl_dr->wValue = cpu_to_le16(PIO_CTRL_VALUE);
@@ -320,9 +312,9 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
                             pio_ctrl_callback,
                             dev);
 
-  usb_set_intfdata(interface, dev);
 */
->>>>>>> Stashed changes
+
+  usb_set_intfdata(interface, dev);
   /* We can register the device now, as it is ready */
   retval = usb_register_dev(interface, &pio_class);
 
