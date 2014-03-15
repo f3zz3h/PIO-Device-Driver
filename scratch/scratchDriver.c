@@ -1,3 +1,4 @@
+
 //usb driver written from scratch following ML skeleton code
 
 #include <linux/kernel.h>
@@ -23,7 +24,7 @@
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 #define PIO_MINOR_BASE 0
 #else
-#define PIO_MINOR_BASE 96
+#define PIO_MINOR_BASE 15
 #endif
 
 struct usb_pio {
@@ -128,6 +129,8 @@ static void pio_delete (struct usb_pio *dev)
 
 static int pio_open (struct inode *inode, struct file *file)
 {
+
+  
   return 0;
 }
 
@@ -154,6 +157,32 @@ static struct usb_class_driver pio_class = {
   .fops = &pio_fops,
   .minor_base = PIO_MINOR_BASE,
 };
+
+
+static char* initialise_urb_buffer (int end_point_size, int* buf_err)
+{
+  char* buffer = kmalloc(end_point_size,GFP_KERNEL);
+  if (! buffer)
+  {
+    buf_err = buf_err + 1;
+    return NULL;
+  }
+  return buffer;
+  
+}
+
+static struct urb* initialise_urb(int* urb_err)
+{
+  struct urb* init_urb = usb_alloc_urb(0,GFP_KERNEL);
+  if (! init_urb)
+  {
+    urb_err = urb_err + 1;
+  }    
+  return init_urb;
+  
+  
+}
+
 static struct usb_endpoint_descriptor *set_endpoint(struct usb_endpoint_descriptor *endpoint, int endpoint_type, int endpoint_direction)
 {
 	if   (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == endpoint_direction)
@@ -162,7 +191,11 @@ static struct usb_endpoint_descriptor *set_endpoint(struct usb_endpoint_descript
 	  printk(KERN_INFO KBUILD_MODNAME": interrup endpoint found!\n");
 	  return endpoint;
 	}
+<<<<<<< Updated upstream
 	return NULL;
+=======
+        return NULL;
+>>>>>>> Stashed changes
 }
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
@@ -170,7 +203,7 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   struct usb_pio *dev = NULL;
   struct usb_host_interface *iface_desc;
   struct usb_endpoint_descriptor *endpoint;
-  int i, int_end_size;
+  int i, endpoint_size, buffer_err = 0, urb_err = 0;
   int retval = -ENODEV;
 
   int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0;
@@ -207,24 +240,33 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   for(i = 0; i < iface_desc->desc.bNumEndpoints; ++i)
   {
     endpoint = &iface_desc->endpoint[i].desc;
-    printk(KERN_INFO KBUILD_MODNAME ": Endpoint address %x, endpoint mask %d", endpoint->bEndpointAddress, USB_ENDPOINT_DIR_MASK);
+    printk(KERN_INFO KBUILD_MODNAME ": Endpoint address %x, endpoint mask %d\n", endpoint->bEndpointAddress, USB_ENDPOINT_DIR_MASK);
     if (endpoint->bEndpointAddress == INTERRUPT_ENDPOINT_ADDRESS)
     { 
     	dev->int_in_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_INT, USB_DIR_IN);
     	int_flag = 1;
+        endpoint_size = le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize);
+        dev->int_in_buffer = initialise_urb_buffer(endpoint_size, &buffer_err);
+        dev->int_in_urb = initialise_urb(&urb_err);
     }
     else if (endpoint->bEndpointAddress == BULK_ENDPOINT_ADDRESS_IN)
     {
     	dev->bulk_in_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_BULK, USB_DIR_IN);
     	bulk_flag_in = 1;
+        endpoint_size = le16_to_cpu(dev->bulk_in_endpoint->wMaxPacketSize);
+        dev->bulk_in_buffer = initialise_urb_buffer(endpoint_size, &buffer_err);    
+        dev->bulk_in_urb = initialise_urb(&urb_err);    
     }
     else if ((endpoint->bEndpointAddress == BULK_ENDPOINT_ADDRESS_OUT))
     {
     	dev->bulk_out_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_BULK, USB_DIR_OUT);
     	bulk_flag_out = 1;
+        endpoint_size = le16_to_cpu(dev->bulk_out_endpoint->wMaxPacketSize);
+        dev->bulk_out_buffer = initialise_urb_buffer(endpoint_size, &buffer_err);
+        dev->bulk_out_urb = initialise_urb(&urb_err);        
     }
   }
-  printk("----------");
+  //printk(KERN_INFO KBUILD_MODNAME": buf_err = %d, urb_err = %d ----------\n",buffer_err, urb_err);
 	if ((! dev->int_in_endpoint) && (int_flag))
 	{
 		printk(KERN_INFO KBUILD_MODNAME": could not find interupt in endpoint");
@@ -243,14 +285,51 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 		//DBG_ERR("could not find interupt endpoint");
 		goto error;
 	}
+<<<<<<< Updated upstream
 
   /* ..... */
   usb_set_intfdata(interface, dev);
 
+=======
+//setup control line
+  dev->ctrl_urb = initialise_urb(&urb_err);
+  dev->ctrl_buffer = initialise_urb_buffer(PIO_CTRL_BUFFER_SIZE, &buffer_err);
+  dev->ctrl_dr = initialise_urb_buffer(sizeof (struct usb_ctrlrequest ), &buffer_err);
+  if (buffer_err)
+    {
+      retval = -ENOMEM;
+      goto error;
+    }
+  if (urb_err)
+    {
+      retval = -ENOMEM;
+      goto error;
+    }
+/*//not ready for the stage, still shy
+  dev->ctrl_dr->bRequestType = PIO_CTRL_REQUEST_TYPE;
+  dev->ctrl_dr->bResquest = PIO_CTRL_REQUEST;
+  dev->ctrl_dr->wValue = cpu_to_le16(PIO_CTRL_VALUE);
+  dev->ctrl_dr->wIndex = cpu_to_le16(PIO_CTRL_INDEX);
+  dev->ctrl_dr->wLength = cpu_to_le16(PIO_CTRL_BUFFER_SIZE);
+
+  usb_fill_control_urb(dev->ctrl_urb, dev->udev, 
+                             usb_sndctrlpipe(dev->udev,0), 
+                            (unsigned char *)dev->ctrl_dr, 
+                            dev->ctrl_buffer,
+                            PIO_CTRL_BUFFER_SIZE,
+                            pio_ctrl_callback,
+                            dev);
+
+  usb_set_intfdata(interface, dev);
+*/
+>>>>>>> Stashed changes
   /* We can register the device now, as it is ready */
   retval = usb_register_dev(interface, &pio_class);
 
   /* .......... */
+//    printk(KERN_INFO KBUILD_MODNAME": something anyhting!!\n");
+    
+
   error:
   	  pio_delete(dev);
   	  return retval;

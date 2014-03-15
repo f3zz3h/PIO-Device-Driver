@@ -1,2 +1,2 @@
-/home/luke/DWD/PIO-Device-Driver/scratch/scratchDriver.ko
-/home/luke/DWD/PIO-Device-Driver/scratch/scratchDriver.o
+/home/asauser/PIO-Device-Driver/scratch/scratchDriver.ko
+/home/asauser/PIO-Device-Driver/scratch/scratchDriver.o
