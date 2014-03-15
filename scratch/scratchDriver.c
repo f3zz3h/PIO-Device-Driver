@@ -1,5 +1,6 @@
 //usb driver written from scratch following ML skeleton code
 
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
 
@@ -161,6 +162,7 @@ static struct usb_endpoint_descriptor *set_endpoint(struct usb_endpoint_descript
 	  printk(KERN_INFO KBUILD_MODNAME": interrup endpoint found!\n");
 	  return endpoint;
 	}
+	return NULL;
 }
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
@@ -243,6 +245,7 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 	}
 
   /* ..... */
+  usb_set_intfdata(interface, dev);
 
   /* We can register the device now, as it is ready */
   retval = usb_register_dev(interface, &pio_class);
@@ -257,7 +260,34 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 }
 
 static void pio_disconnect(struct usb_interface *interface)
-{}
+{
+	struct usb_pio *dev;
+	int minor;
+
+	printk("-------DC-------\n");
+	mutex_lock(&disconnect_mutex);	/* Not interruptible */
+
+	dev = usb_get_intfdata(interface);
+	usb_set_intfdata(interface, NULL);
+
+	//down(&dev->sem); /* Not interruptible */
+
+	minor = dev->minor;
+	/* Give back our minor. */
+
+	usb_deregister_dev(interface, &pio_class);
+
+	/* If the device is not opened, then we clean up right now. */
+	if(!dev)
+		printk("Dev is null\n\n");
+
+	kfree(dev);
+
+	mutex_unlock(&disconnect_mutex);
+
+	printk("USB-PIO /dev/pio%d now disconnected\n", minor - PIO_MINOR_BASE);
+
+}
 
 static struct usb_driver usb_pio_driver = {
   .name = "usb_pio",
