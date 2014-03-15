@@ -16,7 +16,8 @@
 #define PIO_STOP 0x1
 
 #define INTERRUPT_ENDPOINT_ADDRESS 0X83
-#define BULK_INTERRUPT_ADDRESS 0X82
+#define BULK_ENDPOINT_ADDRESS_IN 0X82
+#define BULK_ENDPOINT_ADDRESS_OUT 0x01
 
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 #define PIO_MINOR_BASE 0
@@ -43,6 +44,11 @@ struct usb_pio {
   struct usb_endpoint_descriptor *bulk_in_endpoint;
   struct urb *bulk_in_urb;
   int bulk_in_running;
+
+  char  *bulk_out_buffer;
+  struct usb_endpoint_descriptor *bulk_out_endpoint;
+  struct urb *bulk_out_urb;
+  int bulk_out_running;
 
   char *ctrl_buffer;
   struct urb *ctrl_urb;
@@ -147,7 +153,15 @@ static struct usb_class_driver pio_class = {
   .fops = &pio_fops,
   .minor_base = PIO_MINOR_BASE,
 };
-
+static struct usb_endpoint_descriptor *set_endpoint(struct usb_endpoint_descriptor *endpoint, int endpoint_type, int endpoint_direction)
+{
+	if   (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == endpoint_direction)
+	      && ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == endpoint_type))
+	{
+	  printk(KERN_INFO KBUILD_MODNAME": interrup endpoint found!\n");
+	  return endpoint;
+	}
+}
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
   struct usb_device *udev = interface_to_usbdev(interface);
@@ -156,6 +170,8 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   struct usb_endpoint_descriptor *endpoint;
   int i, int_end_size;
   int retval = -ENODEV;
+
+  int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0;
 
   if (! udev)
   {
@@ -192,20 +208,39 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
     printk(KERN_INFO KBUILD_MODNAME ": Endpoint address %x, endpoint mask %d", endpoint->bEndpointAddress, USB_ENDPOINT_DIR_MASK);
     if (endpoint->bEndpointAddress == INTERRUPT_ENDPOINT_ADDRESS)
     { 
-      if   (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN)
-         && ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_INT))
-       {
-          dev->int_in_endpoint = endpoint;
-          printk(KERN_INFO KBUILD_MODNAME": interrup endpoint found!\n");
-       }
-    }    
+    	dev->int_in_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_INT, USB_DIR_IN);
+    	int_flag = 1;
+    }
+    else if (endpoint->bEndpointAddress == BULK_ENDPOINT_ADDRESS_IN)
+    {
+    	dev->bulk_in_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_BULK, USB_DIR_IN);
+    	bulk_flag_in = 1;
+    }
+    else if ((endpoint->bEndpointAddress == BULK_ENDPOINT_ADDRESS_OUT))
+    {
+    	dev->bulk_out_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_BULK, USB_DIR_OUT);
+    	bulk_flag_out = 1;
+    }
   }
-  if(! dev->int_in_endpoint)
-  {
-    //DBG_ERR("could not find interupt endpoint");
-    printk(KERN_INFO KBUILD_MODNAME": could not find interrupt endpoint");
-    goto error;
-  }
+  printk("----------");
+	if ((! dev->int_in_endpoint) && (int_flag))
+	{
+		printk(KERN_INFO KBUILD_MODNAME": could not find interupt in endpoint");
+		//DBG_ERR("could not find interupt endpoint");
+		goto error;
+	}
+	if ((! dev->bulk_in_endpoint)&& (bulk_flag_in))
+	{
+		printk(KERN_INFO KBUILD_MODNAME": could not find bulk in endpoint");
+		//DBG_ERR("could not find interupt endpoint");
+		goto error;
+	}
+	if ((! dev->bulk_out_endpoint)&& (bulk_flag_out))
+	{
+		printk(KERN_INFO KBUILD_MODNAME": could not find bulk out endpoint");
+		//DBG_ERR("could not find interupt endpoint");
+		goto error;
+	}
 
   /* ..... */
 
@@ -214,11 +249,11 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 
   /* .......... */
   error:
-  pio_delete(dev);
-  return retval;
+  	  pio_delete(dev);
+  	  return retval;
 
   exit:
-  return retval;
+  	  return retval;
 }
 
 static void pio_disconnect(struct usb_interface *interface)
