@@ -7,6 +7,7 @@
 
 #include <linux/slab.h> //kalloc
 #include <linux/usb.h> //usb stuff :D
+#include <linux/usb/cdc.h>
 #include <linux/mutex.h> //mutexes
 #include <linux/ioctl.h>
 
@@ -21,6 +22,8 @@
 #define BULK_ENDPOINT_ADDRESS_IN 0X82
 #define BULK_ENDPOINT_ADDRESS_OUT 0x01
 
+#define CDC_DATA_INTERFACE_TYPE	0x0a
+
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 #define PIO_MINOR_BASE 0
 #else
@@ -28,25 +31,28 @@
 #endif
 
 struct usb_pio {
-  struct usb_device *udev;
-  struct usb_interface *interface;
-  unsigned char minor;
-  char unsigned serial_number[8];
+  struct usb_device *udev;                    //the usb_device
+  struct usb_interface *control_interface;   //control interface - a signle INT endpoint
+  struct usb_interface *data_interface;      //data interface - holds rx and tx lines
+  unsigned char minor;                       //minor number for /proc/dev
+  char unsigned serial_number[8];            //number that comes with the device
   
   int open_count;
   struct semaphore sem;
   spinlock_t cmd_spinlock;
 
-  char *int_in_buffer;
-  struct usb_endpoint_descriptor *int_in_endpoint;
-  struct urb *int_in_urb;
-  int int_in_running;
+  char *int_in_buffer;                       //ctrl buffer
+  struct usb_endpoint_descriptor *int_in_endpoint;  //ctrl endpoint
+  struct urb *int_in_urb;                    //ctrl urb
+  int int_in_running;                        //??
  
-  char  *bulk_in_buffer;
+  //rx
+  char  *bulk_in_buffer;                     
   struct usb_endpoint_descriptor *bulk_in_endpoint;
-  struct urb *bulk_in_urb;
+  struct urb *bulk_in_urb; 
   int bulk_in_running;
-
+  
+  //rx
   char  *bulk_out_buffer;
   struct usb_endpoint_descriptor *bulk_out_endpoint;
   struct urb *bulk_out_urb;
@@ -198,19 +204,26 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   struct usb_device *udev = interface_to_usbdev(interface);
   struct usb_pio *dev = NULL;
   struct usb_host_interface *iface_desc;
-  struct usb_endpoint_descriptor *endpoint;
-  int i, endpoint_size, buffer_err = 0, urb_err = 0;
+  int i;
   int retval = -ENODEV;
-
   int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0;
+  u8 call_management_function = 3;
+  int call_interface_num = 14;
+  struct usb_interface *control_interface;
+  struct usb_interface *data_interface;
 
+  //3 14 642 mI 0 sI 1
+  //collate interfaces 
+   iface_desc = interface->cur_altsetting;
+   control_interface = usb_ifnum_to_if(udev, 0);
+   data_interface = usb_ifnum_to_if(udev, 1);
+  
   if (! udev)
-  {
-    //DBG_ERR("udev is NULL");
-    printk(KERN_INFO KBUILD_MODNAME": udev is null");
-    goto exit;
-  }
-
+    {
+      //DBG_ERR("udev is NULL");
+      printk(KERN_INFO KBUILD_MODNAME": udev is null");
+      goto exit;
+    }
 
   dev = kzalloc(sizeof(struct usb_pio), GFP_KERNEL);
 
@@ -222,99 +235,50 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
     goto exit;
   }
 
-  dev->command = PIO_STOP;
+  //dev->command = PIO_STOP;
 
   sema_init(&dev->sem,1);
   spin_lock_init(&dev->cmd_spinlock);
-
-  dev->udev = udev;
-  dev->interface = interface;
-  iface_desc = interface->cur_altsetting;
   
-  printk(KERN_INFO KBUILD_MODNAME ": %d endpoints found", iface_desc->desc.bNumEndpoints);
+  printk(KERN_INFO KBUILD_MODNAME ": %d endpoints found\n", iface_desc->desc.bNumEndpoints);
+  //add some checking here so that it doesn't crash 
+  dev->int_in_endpoint = &control_interface->cur_altsetting->endpoint[0];
+  dev->bulk_in_endpoint = &data_interface->cur_altsetting->endpoint[1];
+  dev->bulk_out_endpoint = &data_interface->cur_altsetting->endpoint[2];
+  
+  dev->control_interface = control_interface;
+  dev->data_interface = data_interface;
+  dev->udev = udev;
+          
 
-  for(i = 0; i < iface_desc->desc.bNumEndpoints; ++i)
-  {
-    endpoint = &iface_desc->endpoint[i].desc;
-    printk(KERN_INFO KBUILD_MODNAME ": Endpoint address %x, endpoint mask %d\n", endpoint->bEndpointAddress, USB_ENDPOINT_DIR_MASK);
-    if (endpoint->bEndpointAddress == INTERRUPT_ENDPOINT_ADDRESS)
-    { 
-    	dev->int_in_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_INT, USB_DIR_IN);
-    	int_flag = 1;
-        endpoint_size = le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize);
-        dev->int_in_buffer = initialise_urb_buffer(endpoint_size, &buffer_err);
-        dev->int_in_urb = initialise_urb(&urb_err);
-    }
-    else if (endpoint->bEndpointAddress == BULK_ENDPOINT_ADDRESS_IN)
-    {
-    	dev->bulk_in_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_BULK, USB_DIR_IN);
-    	bulk_flag_in = 1;
-        endpoint_size = le16_to_cpu(dev->bulk_in_endpoint->wMaxPacketSize);
-        dev->bulk_in_buffer = initialise_urb_buffer(endpoint_size, &buffer_err);    
-        dev->bulk_in_urb = initialise_urb(&urb_err);    
-    }
-    else if ((endpoint->bEndpointAddress == BULK_ENDPOINT_ADDRESS_OUT))
-    {
-    	dev->bulk_out_endpoint = set_endpoint(endpoint, USB_ENDPOINT_XFER_BULK, USB_DIR_OUT);
-    	bulk_flag_out = 1;
-        endpoint_size = le16_to_cpu(dev->bulk_out_endpoint->wMaxPacketSize);
-        dev->bulk_out_buffer = initialise_urb_buffer(endpoint_size, &buffer_err);
-        dev->bulk_out_urb = initialise_urb(&urb_err);        
-    }
-  }
   //printk(KERN_INFO KBUILD_MODNAME": buf_err = %d, urb_err = %d ----------\n",buffer_err, urb_err);
-	if ((! dev->int_in_endpoint) && (int_flag))
-	{
-		printk(KERN_INFO KBUILD_MODNAME": could not find interupt in endpoint");
-		//DBG_ERR("could not find interupt endpoint");
-		goto error;
-	}
-	if ((! dev->bulk_in_endpoint)&& (bulk_flag_in))
-	{
-		printk(KERN_INFO KBUILD_MODNAME": could not find bulk in endpoint");
-		//DBG_ERR("could not find interupt endpoint");
-		goto error;
-	}
-	if ((! dev->bulk_out_endpoint)&& (bulk_flag_out))
-	{
-		printk(KERN_INFO KBUILD_MODNAME": could not find bulk out endpoint");
-		//DBG_ERR("could not find interupt endpoint");
-		goto error;
-	}
-
-//setup control line
-	/*//not ready for the stage, still shy
-  dev->ctrl_urb = initialise_urb(&urb_err);
-  dev->ctrl_buffer = initialise_urb_buffer(PIO_CTRL_BUFFER_SIZE, &buffer_err);
-  dev->ctrl_dr = initialise_urb_buffer(sizeof (struct usb_ctrlrequest ), &buffer_err);
-  if (buffer_err)
+  if ((! dev->int_in_endpoint) && (int_flag))
     {
-      retval = -ENOMEM;
+      printk(KERN_INFO KBUILD_MODNAME": could not find interupt in endpoint");
+      //DBG_ERR("could not find interupt endpoint");
       goto error;
     }
-  if (urb_err)
+  if ((! dev->bulk_in_endpoint)&& (bulk_flag_in))
     {
-      retval = -ENOMEM;
+      printk(KERN_INFO KBUILD_MODNAME": could not find bulk in endpoint");
+      //DBG_ERR("could not find interupt endpoint");
       goto error;
     }
-
-  dev->ctrl_dr->bRequestType = PIO_CTRL_REQUEST_TYPE;
-  dev->ctrl_dr->bResquest = PIO_CTRL_REQUEST;
-  dev->ctrl_dr->wValue = cpu_to_le16(PIO_CTRL_VALUE);
-  dev->ctrl_dr->wIndex = cpu_to_le16(PIO_CTRL_INDEX);
-  dev->ctrl_dr->wLength = cpu_to_le16(PIO_CTRL_BUFFER_SIZE);
-
-  usb_fill_control_urb(dev->ctrl_urb, dev->udev, 
-                             usb_sndctrlpipe(dev->udev,0), 
-                            (unsigned char *)dev->ctrl_dr, 
-                            dev->ctrl_buffer,
-                            PIO_CTRL_BUFFER_SIZE,
-                            pio_ctrl_callback,
-                            dev);
-
-*/
+  if ((! dev->bulk_out_endpoint)&& (bulk_flag_out))
+    {
+      printk(KERN_INFO KBUILD_MODNAME": could not find bulk out endpoint");
+      //DBG_ERR("could not find interupt endpoint");
+      goto error;
+    }
+  //loading up usb_pio
 
   usb_set_intfdata(interface, dev);
+  //i = device_create_file(&interface->dev, &dev_attr_bmCapabilities);
+  printk("=====country code = %d =====\n",i);
+  usb_driver_claim_interface(&usb_pio_driver, data_interface, dev);
+  usb_set_intfdata(data_interface, dev);
+
+  //usb_get_intfdata(control_interface);
   /* We can register the device now, as it is ready */
   retval = usb_register_dev(interface, &pio_class);
 
@@ -352,7 +316,7 @@ static void pio_disconnect(struct usb_interface *interface)
 	if(!dev)
 		printk("Dev is null\n\n");
 
-	kfree(dev);
+	//kfree(dev);
 
 	mutex_unlock(&disconnect_mutex);
 
