@@ -188,7 +188,7 @@ static struct urb* initialise_urb(int* urb_err)
   
   
 }
-
+/*//not currently neccassary
 static struct usb_endpoint_descriptor *set_endpoint(struct usb_endpoint_descriptor *endpoint, int endpoint_type, int endpoint_direction)
 {
 	if   (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == endpoint_direction)
@@ -199,6 +199,7 @@ static struct usb_endpoint_descriptor *set_endpoint(struct usb_endpoint_descript
 	}
 	return NULL;
 }
+*/
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
   struct usb_device *udev = interface_to_usbdev(interface);
@@ -206,7 +207,7 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   struct usb_host_interface *iface_desc;
   int i;
   int retval = -ENODEV;
-  int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0;
+  int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0, buf_err = 0, urb_err = 0;
   u8 call_management_function = 3;
   int call_interface_num = 14;
   struct usb_interface *control_interface;
@@ -243,8 +244,14 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   printk(KERN_INFO KBUILD_MODNAME ": %d endpoints found\n", iface_desc->desc.bNumEndpoints);
   //add some checking here so that it doesn't crash 
   dev->int_in_endpoint = &control_interface->cur_altsetting->endpoint[0];
+  dev->int_in_buffer = initialise_urb_buffer(sizeof(char[8]), &buf_err);
+  dev->int_in_buffer = initialise_urb(&urb_err);
   dev->bulk_in_endpoint = &data_interface->cur_altsetting->endpoint[1];
+  dev->bulk_in_buffer = initialise_urb_buffer(sizeof(char[32]),&buf_err);
+  dev->bulk_in_urb = initialise_urb(&ur_err);
   dev->bulk_out_endpoint = &data_interface->cur_altsetting->endpoint[2];
+  dev->bulk_out_buffer = initialise_urb_buffer(sizeof(char[32]), &buf_err);
+  dev->bulk_out_urb = initialise_urb(&urb_err);
   
   dev->control_interface = control_interface;
   dev->data_interface = data_interface;
@@ -280,7 +287,7 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 
   //usb_get_intfdata(control_interface);
   /* We can register the device now, as it is ready */
-  retval = usb_register_dev(interface, &pio_class);
+  retval = usb_register_dev(interface, &pio_class);  //cdc-acm driver dones't think we need this
 
   /* .......... */
 //    printk(KERN_INFO KBUILD_MODNAME": something anyhting!!\n");
@@ -297,13 +304,19 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 static void pio_disconnect(struct usb_interface *interface)
 {
 	struct usb_pio *dev;
+        struct usb_device* usb_dev = interface_to_usbdev(interface);
 	int minor;
 
 	printk("-------DC-------\n");
-	mutex_lock(&disconnect_mutex);	/* Not interruptible */
 
 	dev = usb_get_intfdata(interface);
 	usb_set_intfdata(interface, NULL);
+	if(!dev)
+        {
+		printk("Dev is null\n\n");
+                return;
+        }
+	mutex_lock(&disconnect_mutex);	/* Not interruptible */
 
 	//down(&dev->sem); /* Not interruptible */
 
@@ -313,9 +326,6 @@ static void pio_disconnect(struct usb_interface *interface)
 	usb_deregister_dev(interface, &pio_class);
 
 	/* If the device is not opened, then we clean up right now. */
-	if(!dev)
-		printk("Dev is null\n\n");
-
 	//kfree(dev);
 
 	mutex_unlock(&disconnect_mutex);
