@@ -151,35 +151,42 @@ static int pio_release (struct inode *inode, struct file *file)
 	struct usb_pio *dev = NULL;
 	int retval = 0;
 
+	printk(KERN_INFO KBUILD_MODNAME"----- I'm closing-------\n");
+
 	dev = file->private_data;
 
 	if (! dev) {
-		DBG_ERR("dev is NULL");
+		//DBG_ERR("dev is NULL");
 		retval =  -ENODEV;
 		goto exit;
 	}
 
 	/* Lock our device */
+	/*
 	if (down_interruptible(&dev->sem)) {
 		retval = -ERESTARTSYS;
 		goto exit;
 	}
+	*/
 
 	if (dev->open_count <= 0) {
-		DBG_ERR("device not opened");
+		//DBG_ERR("device not opened");
 		retval = -ENODEV;
 		goto unlock_exit;
 	}
 
+
 	if (! dev->udev) {
-		DBG_DEBUG("device unplugged before the file was released");
-		up (&dev->sem);	/* Unlock here as pio_delete frees dev. */
+		//DBG_DEBUG("device unplugged before the file was released");
+
+		/* Unlock here as pio_delete frees dev. */
+		up (&dev->sem);
 		pio_delete(dev);
 		goto exit;
 	}
 
 	if (dev->open_count > 1)
-		DBG_DEBUG("open_count = %d", dev->open_count);
+		//DBG_DEBUG("open_count = %d", dev->open_count);
 
 	pio_abort_transfers(dev);
 	--dev->open_count;
