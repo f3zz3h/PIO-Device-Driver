@@ -136,7 +136,13 @@ static void pio_delete (struct usb_pio *dev)
 static int pio_open (struct inode *inode, struct file *file)
 {
 
-  
+  struct usb_pio *dev = NULL;
+  struct usb_interface *interface;
+  int subminor;
+  int retval = 0;
+
+  printk(KERN_INFO KBUILD_MODNAME"------------ I'm open ------------\n");
+
   return 0;
 }
 
@@ -248,7 +254,7 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   dev->int_in_buffer = initialise_urb(&urb_err);
   dev->bulk_in_endpoint = &data_interface->cur_altsetting->endpoint[1];
   dev->bulk_in_buffer = initialise_urb_buffer(sizeof(char[32]),&buf_err);
-  dev->bulk_in_urb = initialise_urb(&ur_err);
+  dev->bulk_in_urb = initialise_urb(&urb_err);
   dev->bulk_out_endpoint = &data_interface->cur_altsetting->endpoint[2];
   dev->bulk_out_buffer = initialise_urb_buffer(sizeof(char[32]), &buf_err);
   dev->bulk_out_urb = initialise_urb(&urb_err);
