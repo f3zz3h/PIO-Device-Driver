@@ -134,74 +134,8 @@ static void pio_delete (struct usb_pio *dev)
 }
 
 static void pio_int_in_callback(struct urb *urb)
-{
-	struct usb_pio *dev = urb->context;
-	int retval;
-
-	//ml_debug_data(__FUNCTION__, urb->actual_length, urb->transfer_buffer);
-
-	if (urb->status) {
-		if (urb->status == -ENOENT ||
-				urb->status == -ECONNRESET ||
-				urb->status == -ESHUTDOWN) {
-			return;
-		} else {
-			//DBG_ERR("non-zero urb status (%d)", urb->status);
-			goto resubmit; /* Maybe we can recover. */
-		}
-	}
-
-	if (urb->actual_length > 0) {
-		spin_lock(&dev->cmd_spinlock);
-
-		/*
-		if (dev->int_in_buffer[0] & ML_MAX_UP && dev->command & ML_UP) {
-			dev->command &= ~ML_UP;
-			dev->correction_required = 1;
-		} else if (dev->int_in_buffer[0] & ML_MAX_DOWN &&
-				dev->command & ML_DOWN) {
-			dev->command &= ~ML_DOWN;
-			dev->correction_required = 1;
-		}
-
-		if (dev->int_in_buffer[1] & ML_MAX_LEFT && dev->command & ML_LEFT) {
-			dev->command &= ~ML_LEFT;
-			dev->correction_required = 1;
-		} else if (dev->int_in_buffer[1] & ML_MAX_RIGHT &&
-				dev->command & ML_RIGHT) {
-			dev->command &= ~ML_RIGHT;
-			dev->correction_required = 1;
-		}
-
-		if (dev->correction_required) {
-			dev->ctrl_buffer[0] = dev->command;
-			spin_unlock(&dev->cmd_spinlock);
-			retval = usb_submit_urb(dev->ctrl_urb, GFP_ATOMIC);
-			if (retval) {
-				DBG_ERR("submitting correction control URB failed (%d)",
-						retval);
-			}
-		*/
-		} else {
-			spin_unlock(&dev->cmd_spinlock);
-		}
-	}
-
-resubmit:
-	/* Resubmit if we're still running. */
-	if (dev->int_in_running && dev->udev) {
-		retval = usb_submit_urb(dev->int_in_urb, GFP_ATOMIC);
-		if (retval) {
-			//DBG_ERR("resubmitting urb failed (%d)", retval);
-			dev->int_in_running = 0;
-		}
-	}
-}
-
-
 static int pio_open (struct inode *inode, struct file *file)
 {
-
   struct usb_pio *dev = NULL;
   struct usb_interface *interface;
   int subminor;
@@ -209,59 +143,97 @@ static int pio_open (struct inode *inode, struct file *file)
   
   subminor = iminor(inode);
 
-  //printk(KERN_INFO KBUILD_MODNAME"------------ I'm open minor number %d------------\n", subminor);
+  //add mutex here
 
+  interface = usb_find_interface(&usb_pio_driver, subminor);
+  //bail if interface not found
+  if (interface == NULL) 
+  {
+    printk(KERN_INFO KBUILD_MODNAME "interface == NULL!\n");
+    retval = -ENODEV; 
+    goto exit;
+  }
+  dev = usb_get_intfdata(interface);
+  if (dev == NULL)
+  {
+    printk(KERN_INFO KBUILD_MODNAME "dev == NULL");
+    retval = -ENODEV;
+    goto exit;
+  }
+  //lock device
+  //increment open count
+
+  //insitialise the control URB  -according to cdc-acm
+  //dev->ctrl_urb->dev = dev->udev;
+<<<<<<< Updated upstream
+
+  usb_fill_int_urb(dev->int_in_urb, dev->udev, usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress),
+                   dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize),
+                   pio_int_in_callback, dev, dev->int_in_endpoint->bInterval);
+
+=======
+
+  usb_fill_int_urb(dev->int_in_urb, dev->udev, usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress),
+                   dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize),
+                   pio_int_in_callback, dev, dev->int_in_endpoint->bInterval);
+
+>>>>>>> Stashed changes
+  if (usb_submit_urb(dev->ctrl_urb,GFP_KERNEL))
+  {
+    printk(KERN_INFO KBUILD_MODNAME "failed to submit control urb");
+    goto exit;
+  }
+  file->private_data = dev;
+  
+  usb_autopm_put_interface(dev->control_interface);
+  printk(KERN_INFO KBUILD_MODNAME"------------ I'm open minor number %d------------\n", subminor);
+
+exit:
   return 0;
 }
 
 static int pio_release (struct inode *inode, struct file *file)
 {
+
 	struct usb_pio *dev = NULL;
 	int retval = 0;
-
-	printk(KERN_INFO KBUILD_MODNAME"----- I'm closing-------\n");
-
+/*
 	dev = file->private_data;
 
 	if (! dev) {
-		//DBG_ERR("dev is NULL");
+		DBG_ERR("dev is NULL");
 		retval =  -ENODEV;
 		goto exit;
 	}
 
-	/* Lock our device */
-	/*
+	// Lock our device 
 	if (down_interruptible(&dev->sem)) {
 		retval = -ERESTARTSYS;
 		goto exit;
 	}
-	*/
 
 	if (dev->open_count <= 0) {
-		//DBG_ERR("device not opened");
+		DBG_ERR("device not opened");
 		retval = -ENODEV;
 		goto unlock_exit;
 	}
 
-
 	if (! dev->udev) {
-		//DBG_DEBUG("device unplugged before the file was released");
-
-		/* Unlock here as pio_delete frees dev. */
-		up (&dev->sem);
+		DBG_DEBUG("device unplugged before the file was released");
+		up (&dev->sem);	// Unlock here as pio_delete frees dev.
 		pio_delete(dev);
 		goto exit;
 	}
 
 	if (dev->open_count > 1)
-		//DBG_DEBUG("open_count = %d", dev->open_count);
+		DBG_DEBUG("open_count = %d", dev->open_count);
 
 	pio_abort_transfers(dev);
 	--dev->open_count;
 
 unlock_exit:
 	up(&dev->sem);
-
+*/
 exit:
 	return retval;
 }
