@@ -166,16 +166,23 @@ static int pio_open (struct inode *inode, struct file *file)
   //insitialise the control URB  -according to cdc-acm
   //dev->ctrl_urb->dev = dev->udev;
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 
   usb_fill_int_urb(dev->int_in_urb, dev->udev, usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress),
                    dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize),
                    pio_int_in_callback, dev, dev->int_in_endpoint->bInterval);
+<<<<<<< Updated upstream
 
 =======
 
   usb_fill_int_urb(dev->int_in_urb, dev->udev, usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress),
                    dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize),
                    pio_int_in_callback, dev, dev->int_in_endpoint->bInterval);
+
+>>>>>>> Stashed changes
+=======
 
 >>>>>>> Stashed changes
   if (usb_submit_urb(dev->ctrl_urb,GFP_KERNEL))
