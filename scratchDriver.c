@@ -152,22 +152,23 @@ static void pio_int_in_callback(struct urb *urb)
 		}
 	}
 
-	if (urb->actual_length > 0)
+	/*if (urb->actual_length > 0)
 	{
 		spin_lock(&dev->cmd_spinlock);
-
-
 	}
 	else
 	{
 			spin_unlock(&dev->cmd_spinlock);
 	}
+	*/
 
 resubmit:
 	/* Resubmit if we're still running. */
-	if (dev->int_in_running && dev->udev) {
+	if (dev->int_in_running && dev->udev)
+	{
 		retval = usb_submit_urb(dev->int_in_urb, GFP_ATOMIC);
-		if (retval) {
+		if (retval)
+		{
 			printk(KERN_INFO KBUILD_MODNAME "resubmitting urb failed (%d)", retval);
 			dev->int_in_running = 0;
 		}
@@ -182,15 +183,26 @@ static int pio_open (struct inode *inode, struct file *file)
   
   subminor = iminor(inode);
 
-  mutex_lock(&disconnect_mutex);
+  //mutex_lock(&disconnect_mutex);
+    interface = usb_find_interface(&usb_pio_driver, subminor);
+  	if (interface == NULL)
+	{
+	  printk(KERN_INFO KBUILD_MODNAME "interface == NULL!\n");
+	  retval = -ENODEV;
+	  goto exit;
+	}
 
-  interface = usb_find_interface(&usb_pio_driver, subminor);
-  if (interface == NULL)
+  if(usb_autopm_get_interface(interface) > 0)
   {
-    printk(KERN_INFO KBUILD_MODNAME "interface == NULL!\n");
-    retval = -ENODEV; 
-    goto exit;
+	  printk("Failed on autopm\n");
+	  goto exit;
   }
+  else
+  {
+	  retval = 0;
+  }
+
+  printk("---NUM OF ENDPOINTS: %d ---\n",interface->cur_altsetting->desc.bNumEndpoints);
 
   dev = usb_get_intfdata(interface);
   if (dev == NULL)
@@ -203,16 +215,52 @@ static int pio_open (struct inode *inode, struct file *file)
   /* Increment our usage count for the device. */
   	++dev->open_count;
   	if (dev->open_count > 1)
+  	{
   		printk(KERN_INFO KBUILD_MODNAME"open_count = %d", dev->open_count);
+  	}
+  	if(!dev->udev)
+	{
+	  printk("NO UDEVS!!!!! --------\n");
+	  goto exit;
+	}
+	if(!usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress))
+	{
+	  printk("NO RCV PIPE!!!!! --------\n");
+		  goto exit;
+	}
+	if(!dev->int_in_buffer)
+	{
+		 printk("NO INT IN BUFFER!!!!! --------\n");
+			  goto exit;
+	}
+	if(!le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize))
+	{
+		 printk("NO MAX PACKET SIZE!!!!! --------\n");
+			  goto exit;
+	}
 
+	if(!dev->int_in_endpoint->bInterval)
+	{
+		 printk("NO BINTERVAL!!!!! --------\n");
+			  goto exit;
+	}
+	if(!pio_int_in_callback)
+	{
+		 printk("NO ON CALLBACK!!!!! --------\n");
+			  goto exit;
+	}
 
   //insitialise the control URB  -according to cdc-acm
-  //dev->ctrl_urb->dev = dev->udev;
-
+  dev->int_in_urb->dev = dev->udev;
+  	printk("------GOT TO HERE-------\n");
+/*
    usb_fill_int_urb(dev->int_in_urb, dev->udev,
 		  	  	   usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress),
                    dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize),
                    pio_int_in_callback, dev, dev->int_in_endpoint->bInterval);
+*/
+   printk("------GOT PAST THERE-------\n");
+
 
   dev->int_in_running = 1;
   //mb();  --> not sure what this is??
@@ -232,9 +280,9 @@ static int pio_open (struct inode *inode, struct file *file)
   printk(KERN_INFO KBUILD_MODNAME"------- I'm open minor number %d-------\n", subminor);
 
 unlock_exit:
-  	up(&dev->sem);
+  	//up(&dev->sem);
 exit:
-	mutex_unlock(&disconnect_mutex);
+	//mutex_unlock(&disconnect_mutex);
 	return retval;
 }
 
@@ -261,7 +309,7 @@ static int pio_release (struct inode *inode, struct file *file)
 
 	if (! dev->udev)
 	{
-		prinkt(KERN_INFO KBUILD_MODNAME"device unplugged before the file was released");
+		printk(KERN_INFO KBUILD_MODNAME"device unplugged before the file was released");
 		up (&dev->sem);	/* Unlock here as ml_delete frees dev. */
 		pio_delete(dev);
 		goto exit;
@@ -400,6 +448,20 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
       goto error;
     }
   //loading up usb_pio
+
+
+  /* --------------------------------------------------------------------------------------------------
+   *
+   * 	THIS IS WHERE IT BREAKS ON PROBE!!!
+   *
+   */
+  usb_fill_int_urb(dev->int_in_urb, udev,
+  			 usb_rcvintpipe(udev, dev->int_in_endpoint->bEndpointAddress),
+  			 dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize), pio_int_in_callback, dev,
+  			 /* works around buggy devices */
+  			dev->int_in_endpoint->bInterval ? dev->int_in_endpoint->bInterval : 0xff);
+
+  	//printk("pio%d: USB PIO device\n", minor);
 
   usb_set_intfdata(interface, dev);
   //i = device_create_file(&interface->dev, &dev_attr_bmCapabilities);

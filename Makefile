@@ -1,16 +1,3 @@
-# Uncomment the following to enable debug.
-#DEBUG = y
-
-
-#ifeq ($(DEBUG),y)
-#	DBGFLAGS = -O -g -DML_DEBUG
-#else
-#	DBGFLAGS = -O2
-#endif
-
-#CFLAGS += $(DBGFLAGS)
-
-
 ifneq ($(KERNELRELEASE),)
 	obj-m := scratchDriver.o
 else
@@ -21,6 +8,7 @@ all: default
 
 default:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+	gcc dTest.c -o test
 clean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
 
