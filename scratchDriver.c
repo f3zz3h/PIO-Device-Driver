@@ -194,18 +194,9 @@ static struct urb* initialise_urb(int* urb_err)
   
   
 }
-/*//not currently neccassary
-static struct usb_endpoint_descriptor *set_endpoint(struct usb_endpoint_descriptor *endpoint, int endpoint_type, int endpoint_direction)
-{
-	if   (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == endpoint_direction)
-	      && ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == endpoint_type))
-	{
-	  printk(KERN_INFO KBUILD_MODNAME": interrup endpoint found!\n");
-	  return endpoint;
-	}
-	return NULL;
-}
-*/
+/*
+ *
+ */
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
   struct usb_device *udev = interface_to_usbdev(interface);
@@ -317,27 +308,23 @@ static void pio_disconnect(struct usb_interface *interface)
 
 	dev = usb_get_intfdata(interface);
 	usb_set_intfdata(interface, NULL);
+
 	if(!dev)
-        {
+    {
 		printk("Dev is null\n\n");
-                return;
-        }
+		return;
+    }
+
 	mutex_lock(&disconnect_mutex);	/* Not interruptible */
 
-	//down(&dev->sem); /* Not interruptible */
-
-	minor = dev->minor;
 	/* Give back our minor. */
+	minor = dev->minor;
 
 	usb_deregister_dev(interface, &pio_class);
-
-	/* If the device is not opened, then we clean up right now. */
-	//kfree(dev);
 
 	mutex_unlock(&disconnect_mutex);
 
 	printk("USB-PIO /dev/pio%d now disconnected\n", minor - PIO_MINOR_BASE);
-
 }
 
 static struct usb_driver usb_pio_driver = {
@@ -367,16 +354,10 @@ static void __exit usb_pio_exit(void)
 {
   printk(KERN_INFO KBUILD_MODNAME": good bye!\n");
   usb_deregister(&usb_pio_driver);
-  
 }
-
 
 module_init(usb_pio_init);
 module_exit(usb_pio_exit);
 
 MODULE_AUTHOR("loadsa people!!!");
 MODULE_LICENSE("GPL");
-
-
-
-
