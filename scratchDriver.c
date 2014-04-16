@@ -148,8 +148,47 @@ static int pio_open (struct inode *inode, struct file *file)
 
 static int pio_release (struct inode *inode, struct file *file)
 {
-	usb_kill_urb(usb_pio->irq_in);
-	return 0;
+	struct usb_pio *dev = NULL;
+	int retval = 0;
+
+	dev = file->private_data;
+
+	if (! dev) {
+		DBG_ERR("dev is NULL");
+		retval =  -ENODEV;
+		goto exit;
+	}
+
+	/* Lock our device */
+	if (down_interruptible(&dev->sem)) {
+		retval = -ERESTARTSYS;
+		goto exit;
+	}
+
+	if (dev->open_count <= 0) {
+		DBG_ERR("device not opened");
+		retval = -ENODEV;
+		goto unlock_exit;
+	}
+
+	if (! dev->udev) {
+		DBG_DEBUG("device unplugged before the file was released");
+		up (&dev->sem);	/* Unlock here as pio_delete frees dev. */
+		pio_delete(dev);
+		goto exit;
+	}
+
+	if (dev->open_count > 1)
+		DBG_DEBUG("open_count = %d", dev->open_count);
+
+	pio_abort_transfers(dev);
+	--dev->open_count;
+
+unlock_exit:
+	up(&dev->sem);
+
+exit:
+	return retval;
 }
 
 
