@@ -1,6 +1,6 @@
 #!/bin/sh
 cdc="cdc_acm"
-module="pio"
+module="scratchDriver"
 devname="usb_device"
 device="pio"
 mode=664
@@ -8,21 +8,21 @@ group="wheel"
 
 load()
 {
-	shift
+	#shift
 	insmod ./${module}.ko $* || exit 1
 
 	# Remove stale nodes
-	rm -f /dev/${device}[0-3]
+#	rm -f /dev/${device}[0-3]
 
-	major=$(awk "\$2==\"${devname}\" {print \$1}" /proc/devices)
+#	major=$(awk "\$2==\"${devname}\" {print \$1}" /proc/devices)
 
-	for i in 0 1 2 3; do
-		mknod -m ${mode} "/dev/${device}${i}" c ${major} ${i}
-		echo mknod -m ${mode} "/dev/${device}${i}" c ${major} ${i}
+#	for i in 0 1 2 3; do
+#		mknod -m ${mode} "/dev/${device}${i}" c ${major} ${i}
+#		echo mknod -m ${mode} "/dev/${device}${i}" c ${major} ${i}
 
-	done
+	#done
 
-	chgrp ${group} /dev/${device}[0-3]
+#	chgrp ${group} /dev/${device}[0-3]
 }
 
 unload()

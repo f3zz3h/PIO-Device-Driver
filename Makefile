@@ -12,7 +12,7 @@
 
 
 ifneq ($(KERNELRELEASE),)
-	obj-m := pio.o
+	obj-m := scratchDriver.o
 else
 	KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 	PWD := $(shell pwd)
