@@ -140,8 +140,10 @@ static int pio_open (struct inode *inode, struct file *file)
   struct usb_interface *interface;
   int subminor;
   int retval = 0;
+  
+  subminor = iminor(inode);
 
-  printk(KERN_INFO KBUILD_MODNAME"------------ I'm open ------------\n");
+  //printk(KERN_INFO KBUILD_MODNAME"------------ I'm open minor number %d------------\n", subminor);
 
   return 0;
 }
@@ -201,6 +203,7 @@ static struct file_operations pio_fops = {
   .owner = THIS_MODULE,
   .write = pio_write,
   .open = pio_open,
+
   .release = pio_release,
 };
 
