@@ -148,7 +148,8 @@ static int pio_open (struct inode *inode, struct file *file)
 
 static int pio_release (struct inode *inode, struct file *file)
 {
-  return 0;
+	usb_kill_urb(usb_pio->irq_in);
+	return 0;
 }
 
 
