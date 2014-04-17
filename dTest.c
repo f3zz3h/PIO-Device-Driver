@@ -8,5 +8,5 @@ int main (void)
   driverFp = fopen("/dev/pio0", "r");
   printf("OPENING DRIVER!!\n");
   //fclose(driverFp);
-  //printf("Close DRIVERS!!\n");
+  printf("Close DRIVERS!!\n");
 }

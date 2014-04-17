@@ -75,6 +75,10 @@ MODULE_DEVICE_TABLE (usb, pio_id_table);
 static DEFINE_MUTEX(disconnect_mutex);
 static struct usb_driver usb_pio_driver;
 
+/* Globals */
+struct usb_pio *global_dev;
+
+
 static void pio_abort_transfers(struct usb_pio *dev)
 {
   if (!dev)
@@ -139,11 +143,17 @@ static void pio_int_in_callback(struct urb *urb)
 	struct usb_pio *dev = urb->context;
 	int retval;
 
+	if (!dev)
+	{
+		printk("DEV IS NULL!!\n");
+		return;
+	}
 	if (urb->status)
 	{
 		if (urb->status == -ENOENT || urb->status == -ECONNRESET ||
 					urb->status == -ESHUTDOWN)
 		{
+			printk("Error submitting URB");
 			return;
 		}
 		else
@@ -163,6 +173,7 @@ static void pio_int_in_callback(struct urb *urb)
 	*/
 
 resubmit:
+	printk("SUBMITING URB\n");
 	/* Resubmit if we're still running. */
 	if (dev->int_in_running && dev->udev)
 	{
@@ -177,48 +188,42 @@ resubmit:
 static int pio_open (struct inode *inode, struct file *file)
 {
   struct usb_pio *dev = NULL;
-  struct usb_interface *interface;
+  struct usb_interface *control_interface;
+  struct usb_interface *data_interface;
   int subminor;
   int retval = 0;
   
   subminor = iminor(inode);
 
   //mutex_lock(&disconnect_mutex);
-    interface = usb_find_interface(&usb_pio_driver, subminor);
-  	if (interface == NULL)
-	{
-	  printk(KERN_INFO KBUILD_MODNAME "interface == NULL!\n");
-	  retval = -ENODEV;
-	  goto exit;
-	}
 
-  if(usb_autopm_get_interface(interface) > 0)
-  {
-	  printk("Failed on autopm\n");
-	  goto exit;
-  }
-  else
-  {
-	  retval = 0;
-  }
-
-  printk("---NUM OF ENDPOINTS: %d ---\n",interface->cur_altsetting->desc.bNumEndpoints);
-
-  dev = usb_get_intfdata(interface);
-  if (dev == NULL)
+  dev = global_dev;
+  if (!global_dev)
   {
     printk(KERN_INFO KBUILD_MODNAME "dev == NULL");
     retval = -ENODEV;
     goto exit;
   }
 
-  /* Increment our usage count for the device. */
-  	++dev->open_count;
+  /*if(dev->open_count)
+  {
+	 printk("Attempting to update open_count\n");
+	// Increment our usage count for the device.
+   	++dev->open_count;
   	if (dev->open_count > 1)
   	{
   		printk(KERN_INFO KBUILD_MODNAME"open_count = %d", dev->open_count);
   	}
-  	if(!dev->udev)
+  }
+  else
+  {
+	  printk("NO COUNT!!!!! --------\n");
+	 	  //goto exit;
+  }
+  */
+
+
+  	if(!global_dev->udev)
 	{
 	  printk("NO UDEVS!!!!! --------\n");
 	  goto exit;
@@ -244,21 +249,16 @@ static int pio_open (struct inode *inode, struct file *file)
 		 printk("NO BINTERVAL!!!!! --------\n");
 			  goto exit;
 	}
-	if(!pio_int_in_callback)
-	{
-		 printk("NO ON CALLBACK!!!!! --------\n");
-			  goto exit;
-	}
 
   //insitialise the control URB  -according to cdc-acm
-  dev->int_in_urb->dev = dev->udev;
+ //dev->int_in_urb->dev = dev->udev;
   	printk("------GOT TO HERE-------\n");
-/*
+
    usb_fill_int_urb(dev->int_in_urb, dev->udev,
 		  	  	   usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress),
                    dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize),
                    pio_int_in_callback, dev, dev->int_in_endpoint->bInterval);
-*/
+
    printk("------GOT PAST THERE-------\n");
 
 
@@ -288,10 +288,11 @@ exit:
 
 static int pio_release (struct inode *inode, struct file *file)
 {
+/*
 	struct usb_pio *dev = NULL;
 	int retval = 0;
 
-	dev = file->private_data;
+	dev = global_dev;
 
 	if (! dev)
 	{
@@ -304,13 +305,13 @@ static int pio_release (struct inode *inode, struct file *file)
 	{
 		printk(KERN_INFO KBUILD_MODNAME"device not opened");
 		retval = -ENODEV;
-		goto unlock_exit;
+		goto exit;
 	}
 
 	if (! dev->udev)
 	{
 		printk(KERN_INFO KBUILD_MODNAME"device unplugged before the file was released");
-		up (&dev->sem);	/* Unlock here as ml_delete frees dev. */
+		up (&dev->sem);	// Unlock here as pio_delete frees dev.
 		pio_delete(dev);
 		goto exit;
 	}
@@ -321,13 +322,11 @@ static int pio_release (struct inode *inode, struct file *file)
 	}
 
 	pio_abort_transfers(dev);
-	--dev->open_count;
-
-unlock_exit:
-	up(&dev->sem);
+//	--dev->open_count;
 
 exit:
 	return retval;
+	*/
 }
 
 static ssize_t pio_write (struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)
@@ -370,7 +369,6 @@ static struct urb* initialise_urb(int* urb_err)
   }    
   return init_urb;
   
-  
 }
 /*
  *
@@ -380,11 +378,8 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   struct usb_device *udev = interface_to_usbdev(interface);
   struct usb_pio *dev = NULL;
   struct usb_host_interface *iface_desc;
-  int i;
   int retval = -ENODEV;
   int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0, buf_err = 0, urb_err = 0;
-  u8 call_management_function = 3;
-  int call_interface_num = 14;
   struct usb_interface *control_interface;
   struct usb_interface *data_interface;
 
@@ -411,16 +406,14 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
     goto exit;
   }
 
-  //dev->command = PIO_STOP;
-
-  sema_init(&dev->sem,1);
-  spin_lock_init(&dev->cmd_spinlock);
+  //sema_init(&dev->sem,1);
+  //spin_lock_init(&dev->cmd_spinlock);
   
   printk(KERN_INFO KBUILD_MODNAME ": %d endpoints found\n", iface_desc->desc.bNumEndpoints);
   //add some checking here so that it doesn't crash 
   dev->int_in_endpoint = &control_interface->cur_altsetting->endpoint[0];
   dev->int_in_buffer = initialise_urb_buffer(sizeof(char[8]), &buf_err);
-  dev->int_in_buffer = initialise_urb(&urb_err);
+  dev->int_in_urb = initialise_urb(&urb_err);
   dev->bulk_in_endpoint = &data_interface->cur_altsetting->endpoint[1];
   dev->bulk_in_buffer = initialise_urb_buffer(sizeof(char[32]),&buf_err);
   dev->bulk_in_urb = initialise_urb(&urb_err);
@@ -431,6 +424,11 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   dev->control_interface = control_interface;
   dev->data_interface = data_interface;
   dev->udev = udev;
+
+  if(!dev->udev)
+  {
+	  printk("EARLY NO UDEV");
+  }
           
   if ((! dev->int_in_endpoint) && (int_flag))
     {
@@ -447,32 +445,43 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
       printk(KERN_INFO KBUILD_MODNAME": could not find bulk out endpoint");
       goto error;
     }
-  //loading up usb_pio
 
+  //usb_set_intfdata(interface, dev);
 
-  /* --------------------------------------------------------------------------------------------------
-   *
-   * 	THIS IS WHERE IT BREAKS ON PROBE!!!
-   *
-   */
   usb_fill_int_urb(dev->int_in_urb, udev,
-  			 usb_rcvintpipe(udev, dev->int_in_endpoint->bEndpointAddress),
-  			 dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize), pio_int_in_callback, dev,
-  			 /* works around buggy devices */
-  			dev->int_in_endpoint->bInterval ? dev->int_in_endpoint->bInterval : 0xff);
+    			 usb_rcvintpipe(udev, dev->int_in_endpoint->bEndpointAddress),
+    			 dev->int_in_buffer, le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize), pio_int_in_callback, dev,
+    			 /* works around buggy devices */
+    			dev->int_in_endpoint->bInterval ? dev->int_in_endpoint->bInterval : 0xff);
 
-  	//printk("pio%d: USB PIO device\n", minor);
+  retval = usb_submit_urb(dev->int_in_urb,GFP_KERNEL);
+  if(retval)
+  {
+	  printk("Failed submitting urb in probe\n");
+	  goto error;
+  }
+  else
+  {
+	  printk("Submitted URB successfully\n");
+  }
 
-  usb_set_intfdata(interface, dev);
-  //i = device_create_file(&interface->dev, &dev_attr_bmCapabilities);
-  printk("=====country code = %d =====\n",i);
   usb_driver_claim_interface(&usb_pio_driver, data_interface, dev);
+
   usb_set_intfdata(data_interface, dev);
 
-  //usb_get_intfdata(control_interface);
+  usb_get_intfdata(control_interface);
+  if(!control_interface)
+  {
+	  printk("Control Interface not set\n");
+  }
+
   /* We can register the device now, as it is ready */
   retval = usb_register_dev(interface, &pio_class);  //cdc-acm driver dones't think we need this
 
+  printk("Set dev count open to 0\n");
+  dev->open_count = 0;
+
+  global_dev = dev;
 error:
   pio_delete(dev);
   return retval;
@@ -484,8 +493,6 @@ exit:
 static void pio_disconnect(struct usb_interface *interface)
 {
 	struct usb_pio *dev;
-        struct usb_device* usb_dev = interface_to_usbdev(interface);
-	int minor;
 
 	printk("-------DC-------\n");
 
@@ -500,14 +507,11 @@ static void pio_disconnect(struct usb_interface *interface)
 
 	mutex_lock(&disconnect_mutex);	/* Not interruptible */
 
-	/* Give back our minor. */
-	minor = dev->minor;
-
 	usb_deregister_dev(interface, &pio_class);
 
 	mutex_unlock(&disconnect_mutex);
 
-	printk("USB-PIO /dev/pio%d now disconnected\n", minor - PIO_MINOR_BASE);
+	printk("USB-PIO /dev/pio%d now disconnected\n", dev->minor - PIO_MINOR_BASE);
 }
 
 static struct usb_driver usb_pio_driver = {
