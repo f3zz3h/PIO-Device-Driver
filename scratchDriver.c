@@ -137,38 +137,34 @@ static void pio_delete (struct usb_pio *dev)
 
 static void pio_int_in_callback(struct urb *urb)
 {
-	struct usb_pio *dev = urb->context;
-	int retval;
-	printk ("----Completion handler---- urb status = %d\n", urb->context);
-	if (urb->status)
-	{
-	  if (!(urb->status == -ENOENT || 
-		urb->status == -ECONNRESET ||
-		urb->status == -ESHUTDOWN))
+  struct usb_pio *dev = urb->context;
+  int retval;
+  printk ("----Completion handler----contest=%d\n", urb->status);
+  
+  if (urb->status&& !(urb->status == -ENOENT || 
+		      urb->status == -ECONNRESET ||
+		      urb->status == -ESHUTDOWN))
+    {
+       printk("No zero status recieved\n status ");		   
+    }
+  
+  	
+  usb_free_coherent(urb->dev, urb->transfer_buffer_length, 
+		    urb->transfer_buffer, urb->transfer_dma);
+  
+  /*		
+		resubmit:
+		// Resubmit if we're still running. 
+		if (dev->int_in_running && dev->udev)
 		{
-		  printk("---urb status = %d\n",*urb->context);		   
-		}
-		else
-		{
-		  goto resubmit; /* Maybe we can recover. */
-		}
-	}
-	/*	
-	usb_buffer_free(urb->dev, urb->transfer_buffer_length, 
-			urb->transfer_buffer, urb->transfer_dma);
-	*/
-		
-resubmit:
-	// Resubmit if we're still running. 
-	if (dev->int_in_running && dev->udev)
-	{
 		retval = usb_submit_urb(urb, GFP_ATOMIC);
 		if (retval)
 		{
-			printk(KERN_INFO KBUILD_MODNAME "resubmitting urb failed (%d)", retval);
-			dev->int_in_running = 0;
+		printk(KERN_INFO KBUILD_MODNAME "resubmitting urb failed (%d)", retval);
+		dev->int_in_running = 0;
 		}
 	}
+	*/
 	
 }
 static int pio_open (struct inode *inode, struct file *file)
@@ -177,7 +173,7 @@ static int pio_open (struct inode *inode, struct file *file)
   struct usb_interface *interface;
   int subminor;
   int retval = 0;
-  char buffer[32] = {'0x40','0','0','P','2','3','F','\r'};
+  char buffer[32] = {'@','0','0','P','2','3','F','\r'};
   int i;
   subminor = iminor(inode);
 
@@ -260,12 +256,6 @@ static int pio_open (struct inode *inode, struct file *file)
     {
       printk("interrupt enpoint->bInterval = %d\n", dev->int_in_endpoint->bInterval);
     }
-  if(!pio_int_in_callback)
-    {
-      printk("NO ON CALLBACK!!!!! --------\n");
-      goto exit;
-    }
-  
   //insitialise the control URB  -according to cdc-acm
   //dev->int_in_urb->dev = dev->udev;
   printk("------GOT TO HERE-------\n");
@@ -288,8 +278,9 @@ static int pio_open (struct inode *inode, struct file *file)
 		    usb_sndbulkpipe(dev->udev, dev->bulk_in_endpoint->bEndpointAddress), 
 		    dev->bulk_in_buffer, le16_to_cpu(dev->bulk_in_endpoint->wMaxPacketSize),
 		    pio_int_in_callback, dev);
+  dev->bulk_in_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
   printk("------GOT PAST THERE-------\n");
-  printk("buffer string %\n", dev->bulk_in_buffer); 
+  printk("buffer string %s\n", global_dev->bulk_in_buffer); 
   
   dev->int_in_running = 1;
   //mb();  //--> not sure what this is??
@@ -378,18 +369,6 @@ static struct usb_class_driver pio_class = {
   .minor_base = PIO_MINOR_BASE,
 };
 
-static char* initialise_urb_buffer (int end_point_size, int* buf_err)
-{
-  char* buffer = kmalloc(end_point_size,GFP_KERNEL);
-  if (! buffer)
-  {
-    buf_err = buf_err + 1;
-    return NULL;
-  }
-  return buffer;
-  
-}
-
 static struct urb* initialise_urb(int* urb_err)
 {
   struct urb* init_urb = usb_alloc_urb(0,GFP_KERNEL);
@@ -448,19 +427,24 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
   printk(KERN_INFO KBUILD_MODNAME ": %d endpoints found\n", iface_desc->desc.bNumEndpoints);
   //add some checking here so that it doesn't crash 
   global_dev->int_in_endpoint = &control_interface->cur_altsetting->endpoint[0];
-  global_dev->int_in_buffer = initialise_urb_buffer(sizeof(char[8]), &buf_err);
+ 
   global_dev->int_in_urb = initialise_urb(&urb_err);
   global_dev->bulk_in_endpoint = &data_interface->cur_altsetting->endpoint[1];
-  global_dev->bulk_in_buffer = initialise_urb_buffer(sizeof(char[32]),&buf_err);
+ 
   global_dev->bulk_in_urb = initialise_urb(&urb_err);
   global_dev->bulk_out_endpoint = &data_interface->cur_altsetting->endpoint[2];
-  global_dev->bulk_out_buffer = initialise_urb_buffer(sizeof(char[32]), &buf_err);
   global_dev->bulk_out_urb = initialise_urb(&urb_err);
   
   global_dev->control_interface = control_interface;
   global_dev->data_interface = data_interface;
   global_dev->udev = udev;
-          
+
+  global_dev->int_in_buffer = usb_alloc_coherent(global_dev->udev, sizeof(char[8]),
+						 GFP_KERNEL, &global_dev->int_in_urb->transfer_dma);
+  global_dev->bulk_in_buffer = usb_alloc_coherent(global_dev->udev,sizeof(char[32]), 
+						  GFP_KERNEL, &global_dev->bulk_in_urb->transfer_dma);
+  global_dev->bulk_out_buffer = usb_alloc_coherent(global_dev->udev,sizeof(char[32]),
+						   GFP_KERNEL, &global_dev->bulk_out_urb->transfer_dma);   
   if ((! global_dev->int_in_endpoint) && (int_flag))
     {
       printk(KERN_INFO KBUILD_MODNAME": could not find interupt in endpoint");
