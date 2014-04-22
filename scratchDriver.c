@@ -139,15 +139,14 @@ static void pio_int_in_callback(struct urb *urb)
 {
 	struct usb_pio *dev = urb->context;
 	int retval;
-	printk ("----Completion handler----");
+	printk ("----Completion handler---- urb status = %d\n", urb->context);
 	if (urb->status)
 	{
-		if (urb->status == -ENOENT || 
-		    urb->status == -ECONNRESET ||
-		    urb->status == -ESHUTDOWN)
+	  if (!(urb->status == -ENOENT || 
+		urb->status == -ECONNRESET ||
+		urb->status == -ESHUTDOWN))
 		{
-		  printk("---urb status = %d\n",urb->context);
-		    return;
+		  printk("---urb status = %d\n",*urb->context);		   
 		}
 		else
 		{
