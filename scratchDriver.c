@@ -458,7 +458,9 @@ static void pio_disconnect(struct usb_interface *interface)
 
 	usb_deregister_dev(interface, &pio_class);
 
-	if (!dev->open_count)
+	/*ToDo: get this working */
+	/*
+	 if (!dev->open_count)
 	{
 		up(&dev->sem);
 		pio_delete(dev);
@@ -468,6 +470,7 @@ static void pio_disconnect(struct usb_interface *interface)
 		dev->udev = NULL;
 		up(&dev->sem);
 	}
+	*/
 
 	mutex_unlock(&disconnect_mutex);
 
