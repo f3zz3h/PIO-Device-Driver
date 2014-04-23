@@ -10,7 +10,7 @@ static struct file_operations pio_fops =
 		.write = pio_write,
 		.open = pio_open,
 		.release = 	pio_release,
-		.unlocked_ioctl = pio_ioctl,
+		//.unlocked_ioctl = pio_ioctl,
 };
 
 static struct usb_class_driver pio_class =
@@ -113,14 +113,15 @@ static void pio_int_in_callback(struct urb *urb)
  * *****************************************************************/
 static long pio_ioctl(struct file *file, unsigned int cmd, unsigned long int arg)
 {
+
 	switch (cmd)
 	{
 	case 1:
-		printk("\n----- IM IOCTL %d here my message %s------\n", cmd,
+		printk("----- IM IOCTL %d here my message %s------\n", cmd,
 				(char *) arg);
 		break;
 	default:
-		printk("\n--------ERMERGERD!!-------\n");
+		printk("--OMG! CMD:%d - arg:%d --\n", cmd, (unsigned int)arg);
 	}
 
 	return 0;
@@ -330,11 +331,9 @@ static int pio_probe(struct usb_interface *interface,
 	struct usb_host_interface *iface_desc;
 	int retval = -ENODEV;
 	int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0, urb_err = 0;
-	//unused?? int buf_err = 0;
-	//unused?? u8 call_management_function = 3;
-	//unused?? int call_interface_num = 14;
 	struct usb_interface *control_interface;
 	struct usb_interface *data_interface;
+
 
 	//3 14 642 mI 0 sI 1
 	//collate interfaces
@@ -353,30 +352,26 @@ static int pio_probe(struct usb_interface *interface,
 	global_dev = kzalloc(sizeof(struct usb_pio), GFP_KERNEL);
 	if (!dev)
 	{
-		//DBG_ERR("cannot allocate memory for struct usb_pio");
+		printk("cannot allocate memory for struct usb_pio");
 		printk(KERN_INFO KBUILD_MODNAME": Cannot allocate memory for struct usb_pio");
 		retval = -ENOMEM;
 		goto exit;
 	}
 
-	//dev->command = PIO_STOP;
-
-	sema_init(&dev->sem, 1);
-	spin_lock_init(&dev->cmd_spinlock);
+	sema_init(&global_dev->sem, 1);
+	spin_lock_init(&global_dev->cmd_spinlock);
 
 	printk(KERN_INFO KBUILD_MODNAME ": %d endpoints found\n", iface_desc->desc.bNumEndpoints);
 
 	//add some checking here so that it doesn't crash
 	/* ToDo: Are these assignments correct matty?? */
-	global_dev->int_in_endpoint
-			= &control_interface->cur_altsetting->endpoint[0];
+	global_dev->int_in_endpoint	= &control_interface->cur_altsetting->endpoint[0];
 
 	global_dev->int_in_urb = initialise_urb(&urb_err);
 	global_dev->bulk_in_endpoint = &data_interface->cur_altsetting->endpoint[1];
 
 	global_dev->bulk_in_urb = initialise_urb(&urb_err);
-	global_dev->bulk_out_endpoint
-			= &data_interface->cur_altsetting->endpoint[2];
+	global_dev->bulk_out_endpoint = &data_interface->cur_altsetting->endpoint[2];
 	global_dev->bulk_out_urb = initialise_urb(&urb_err);
 
 	global_dev->control_interface = control_interface;
@@ -391,6 +386,9 @@ static int pio_probe(struct usb_interface *interface,
 	global_dev->bulk_out_buffer = usb_alloc_coherent(global_dev->udev,
 			sizeof(char[32]), GFP_KERNEL,
 			&global_dev->bulk_out_urb->transfer_dma);
+
+	global_dev->open_count = 0;
+
 	if ((!global_dev->int_in_endpoint) && (int_flag))
 	{
 		printk(KERN_INFO KBUILD_MODNAME": could not find interupt in endpoint");
@@ -428,9 +426,10 @@ static int pio_probe(struct usb_interface *interface,
 	/* We can register the device now, as it is ready */
 	retval = usb_register_dev(interface, &pio_class); //cdc-acm driver dones't think we need this
 
-	exit: return retval;
+	exit:
+		return retval;
 	error: pio_delete(dev);
-	return retval;
+		return retval;
 
 }
 /* *****************************************************************
@@ -440,7 +439,6 @@ static int pio_probe(struct usb_interface *interface,
 static void pio_disconnect(struct usb_interface *interface)
 {
 	struct usb_pio *dev;
-	//unused?? struct usb_device* usb_dev = interface_to_usbdev(interface);
 	int minor;
 
 	dev = usb_get_intfdata(interface);
@@ -453,11 +451,23 @@ static void pio_disconnect(struct usb_interface *interface)
 	}
 
 	mutex_lock(&disconnect_mutex); /* Not interruptible */
+	down(&dev->sem);
 
 	/* Give back our minor. */
 	minor = dev->minor;
 
 	usb_deregister_dev(interface, &pio_class);
+
+	if (!dev->open_count)
+	{
+		up(&dev->sem);
+		pio_delete(dev);
+	}
+	else
+	{
+		dev->udev = NULL;
+		up(&dev->sem);
+	}
 
 	mutex_unlock(&disconnect_mutex);
 

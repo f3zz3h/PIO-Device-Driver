@@ -28,6 +28,6 @@ int main(void)
 		// ret = ioctl(driverFp, ret, ret);
 		//printf("ioctl ret val = %d error num = %d err: %s\n", ret, errno, strerror(errno));
 	}
-	//  fclose(driverFp);
-	//printf("Close DRIVERS!!\n");
+	fclose(driverFp);
+	printf("Close DRIVERS!!\n");
 }
