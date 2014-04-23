@@ -5,15 +5,28 @@
 #include "scratchDriver.h"
 
 static struct file_operations pio_fops =
-{ .owner = THIS_MODULE, .write = pio_write, .open = pio_open, .release =
-		pio_release, .unlocked_ioctl = pio_ioctl, };
+{
+		.owner = THIS_MODULE,
+		.write = pio_write,
+		.open = pio_open,
+		.release = 	pio_release,
+		.unlocked_ioctl = pio_ioctl,
+};
 
 static struct usb_class_driver pio_class =
-{ .name = "pio%d", .fops = &pio_fops, .minor_base = PIO_MINOR_BASE, };
+{
+		.name = "pio%d",
+		.fops = &pio_fops,
+		.minor_base = PIO_MINOR_BASE,
+};
 
 static struct usb_driver usb_pio_driver =
-{ .name = "usb_pio", .id_table = pio_id_table, .probe = pio_probe,
-		.disconnect = pio_disconnect, };
+{
+		.name = "usb_pio",
+		.id_table = pio_id_table,
+		.probe = pio_probe,
+		.disconnect = pio_disconnect,
+};
 
 /* *****************************************************************
  *
@@ -84,8 +97,6 @@ static void pio_delete(struct usb_pio *dev)
  * *****************************************************************/
 static void pio_int_in_callback(struct urb *urb)
 {
-	struct usb_pio *dev = urb->context;
-
 	printk("----Completion handler----contest=%d\n", urb->status);
 
 	if (urb->status && !(urb->status == -ENOENT || urb->status == -ECONNRESET
@@ -100,7 +111,7 @@ static void pio_int_in_callback(struct urb *urb)
  *
  *
  * *****************************************************************/
-int pio_ioctl(struct file *file, unsigned int cmd, unsigned long int arg)
+static long pio_ioctl(struct file *file, unsigned int cmd, unsigned long int arg)
 {
 	switch (cmd)
 	{
@@ -224,13 +235,13 @@ static int pio_release(struct inode *inode, struct file *file)
  * *****************************************************************/
 static ssize_t pio_write (struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)
 {
-	printk("-----------WRITING: %s\n", user_buf);
-
 	struct usb_pio *dev;
 	int retval = 0;
 	u8 buf[PIO_CTRL_BUFFER_SIZE];
 	/* Not sure if command should have some better intialization!? */
 	__u8 cmd = 0;
+
+	printk("-----------WRITING: %s\n", user_buf);
 
 	dev = file->private_data;
 
@@ -356,6 +367,7 @@ static int pio_probe(struct usb_interface *interface,
 	printk(KERN_INFO KBUILD_MODNAME ": %d endpoints found\n", iface_desc->desc.bNumEndpoints);
 
 	//add some checking here so that it doesn't crash
+	/* ToDo: Are these assignments correct matty?? */
 	global_dev->int_in_endpoint
 			= &control_interface->cur_altsetting->endpoint[0];
 

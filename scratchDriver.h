@@ -93,7 +93,7 @@ static struct usb_pio* global_dev;
 static void pio_abort_transfers(struct usb_pio *dev);
 static void pio_delete(struct usb_pio *dev);
 static void pio_int_in_callback(struct urb *urb);
-int pio_ioctl(struct file *file, unsigned int cmd, unsigned long int arg);
+static long pio_ioctl(struct file *file, unsigned int cmd, unsigned long int arg);
 static int pio_open(struct inode *inode, struct file *file);
 static int pio_release(struct inode *inode, struct file *file);
 static ssize_t pio_write (struct file *file, const char __user *user_buf, size_t count, loff_t *ppos);
