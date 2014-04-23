@@ -8,7 +8,7 @@ all: default
 
 default:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
-	gcc dTest.c -o test
+	gcc user-space-test.c -o test
 clean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
 

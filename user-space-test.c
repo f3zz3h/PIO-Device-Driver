@@ -1,13 +1,18 @@
-//C program for opening and writing/reading to the driver
-
+/* *****************************************************************
+ * usb driver written from scratch following ML skeleton code
+ * C program for opening and writing/reading to the driver
+ * *****************************************************************/
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <error.h>
 #include <errno.h>
 #include <string.h>
-//#include <sys/ioctl.h>
 
+/* *****************************************************************
+ *
+ *
+ * *****************************************************************/
 int main (void)
 {
   FILE* driverFp;
