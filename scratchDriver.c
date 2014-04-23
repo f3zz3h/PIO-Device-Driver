@@ -2,95 +2,32 @@
  * usb driver written from scratch following ML skeleton code
  *
  * *****************************************************************/
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/fs.h>
-#include <linux/slab.h> //kalloc
-#include <linux/usb.h> //usb stuff :D
-#include <linux/usb/cdc.h>
-#include <linux/mutex.h> //mutexes
-#include <linux/ioctl.h>
-#include <asm/uaccess.h> // copy_*_user
+#include "scratchDriver.h"
 
-#define VENDOR_ID 0x09ca
-#define PRODUCT_ID 0x5544
-#define PIO_STOP 0x1
-
-#define INTERRUPT_ENDPOINT_ADDRESS 0X83
-#define BULK_ENDPOINT_ADDRESS_IN 0X82
-#define BULK_ENDPOINT_ADDRESS_OUT 0x01
-
-#define CDC_DATA_INTERFACE_TYPE	0x0a
-
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-	#define PIO_MINOR_BASE 0
-#else
-	#define PIO_MINOR_BASE 15
-#endif
-/* *****************************************************************
- *
- *
- * *****************************************************************/
-struct usb_pio
-{
-	struct usb_device *udev; //the usb_device
-	struct usb_interface *control_interface; //control interface - a signle INT endpoint
-	struct usb_interface *data_interface; //data interface - holds rx and tx lines
-	unsigned char minor; //minor number for /proc/dev
-	char unsigned serial_number[8]; //number that comes with the device
-
-	int open_count;
-	struct semaphore sem;
-	spinlock_t cmd_spinlock;
-
-	char *int_in_buffer; //ctrl buffer
-	struct usb_endpoint_descriptor *int_in_endpoint; //ctrl endpoint
-	struct urb *int_in_urb; //ctrl urb
-	int int_in_running; //??
-
-	//rx
-	char *bulk_in_buffer;
-	struct usb_endpoint_descriptor *bulk_in_endpoint;
-	struct urb *bulk_in_urb;
-	int bulk_in_running;
-
-	//rx
-	char *bulk_out_buffer;
-	struct usb_endpoint_descriptor *bulk_out_endpoint;
-	struct urb *bulk_out_urb;
-	int bulk_out_running;
-
-	char *ctrl_buffer;
-	struct urb *ctrl_urb;
-	struct usb_ctrlrequest *ctrl_dr;
-	int correction_required;
-
-	__u8 command;
-};
-
-static struct usb_device_id pio_id_table[] =
-{
-		{ USB_DEVICE(VENDOR_ID, PRODUCT_ID) },
-		{ }
-};
 static struct file_operations pio_fops =
-{ .owner = THIS_MODULE, .write = pio_write, .open = pio_open, .release =
-		pio_release, .unlocked_ioctl = pio_ioctl, };
+{
+		.owner = THIS_MODULE,
+		.write = pio_write,
+		.open = pio_open,
+		.release = pio_release,
+		.unlocked_ioctl = pio_ioctl,
+};
 
 static struct usb_class_driver pio_class =
-{ .name = "pio%d", .fops = &pio_fops, .minor_base = PIO_MINOR_BASE, };
-
+{
+		.name = "pio%d",
+		.fops = &pio_fops,
+		.minor_base = PIO_MINOR_BASE,
+};
 
 static struct usb_driver usb_pio_driver =
-{ .name = "usb_pio", .id_table = pio_id_table, .probe = pio_probe,
-		.disconnect = pio_disconnect, };
+{
+		.name = "usb_pio",
+		.id_table = pio_id_table,
+		.probe = pio_probe,
+		.disconnect = pio_disconnect,
+};
 
-MODULE_DEVICE_TABLE( usb, pio_id_table);
-
-static DEFINE_MUTEX( disconnect_mutex);
-static struct usb_driver usb_pio_driver;
-static struct usb_pio* global_dev;
 /* *****************************************************************
  *
  *
@@ -116,7 +53,6 @@ static void pio_abort_transfers(struct usb_pio *dev)
 	}
 
 	//shutdown transfer
-
 	if (dev->int_in_running)
 	{
 		dev->int_in_running = 0;
@@ -162,7 +98,7 @@ static void pio_delete(struct usb_pio *dev)
 static void pio_int_in_callback(struct urb *urb)
 {
 	struct usb_pio *dev = urb->context;
-	int retval;
+
 	printk("----Completion handler----contest=%d\n", urb->status);
 
 	if (urb->status && !(urb->status == -ENOENT || urb->status == -ECONNRESET
@@ -322,18 +258,16 @@ static struct urb* initialise_urb(int* urb_err)
  *
  *
  * *****************************************************************/
-static int pio_probe(struct usb_interface *interface,
-		const struct usb_device_id *id)
+static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct usb_pio *dev = NULL;
 	struct usb_host_interface *iface_desc;
-	int i;
 	int retval = -ENODEV;
-	int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0, buf_err = 0,
-			urb_err = 0;
-	u8 call_management_function = 3;
-	int call_interface_num = 14;
+	int int_flag = 0, bulk_flag_in = 0, bulk_flag_out = 0, urb_err = 0;
+	//unused?? int buf_err = 0;
+	//unused?? u8 call_management_function = 3;
+	//unused?? int call_interface_num = 14;
 	struct usb_interface *control_interface;
 	struct usb_interface *data_interface;
 
@@ -442,7 +376,7 @@ static int pio_probe(struct usb_interface *interface,
 static void pio_disconnect(struct usb_interface *interface)
 {
 	struct usb_pio *dev;
-	struct usb_device* usb_dev = interface_to_usbdev(interface);
+	//unused?? struct usb_device* usb_dev = interface_to_usbdev(interface);
 	int minor;
 
 	dev = usb_get_intfdata(interface);
