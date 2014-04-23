@@ -27,6 +27,13 @@
 #define BULK_ENDPOINT_ADDRESS_OUT 0x01
 #define CDC_DATA_INTERFACE_TYPE	0x0a
 
+
+#define PIO_CTRL_BUFFER_SIZE 	8
+#define PIO_CTRL_REQEUST_TYPE	0x21 //Pretty sure this is wrong??
+#define PIO_CTRL_REQUEST		0x09
+#define PIO_CTRL_VALUE			0x0
+#define PIO_CTRL_INDEX			0x0
+
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 	#define PIO_MINOR_BASE 0
 #else

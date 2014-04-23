@@ -5,28 +5,15 @@
 #include "scratchDriver.h"
 
 static struct file_operations pio_fops =
-{
-		.owner = THIS_MODULE,
-		.write = pio_write,
-		.open = pio_open,
-		.release = pio_release,
-		.unlocked_ioctl = pio_ioctl,
-};
+{ .owner = THIS_MODULE, .write = pio_write, .open = pio_open, .release =
+		pio_release, .unlocked_ioctl = pio_ioctl, };
 
 static struct usb_class_driver pio_class =
-{
-		.name = "pio%d",
-		.fops = &pio_fops,
-		.minor_base = PIO_MINOR_BASE,
-};
+{ .name = "pio%d", .fops = &pio_fops, .minor_base = PIO_MINOR_BASE, };
 
 static struct usb_driver usb_pio_driver =
-{
-		.name = "usb_pio",
-		.id_table = pio_id_table,
-		.probe = pio_probe,
-		.disconnect = pio_disconnect,
-};
+{ .name = "usb_pio", .id_table = pio_id_table, .probe = pio_probe,
+		.disconnect = pio_disconnect, };
 
 /* *****************************************************************
  *
@@ -238,7 +225,73 @@ static int pio_release(struct inode *inode, struct file *file)
 static ssize_t pio_write (struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)
 {
 	printk("-----------WRITING: %s\n", user_buf);
-	return 0;
+
+	struct usb_pio *dev;
+	int retval = 0;
+	u8 buf[PIO_CTRL_BUFFER_SIZE];
+	/* Not sure if command should have some better intialization!? */
+	__u8 cmd = 0;
+
+	dev = file->private_data;
+
+	/* Verify that the device wasn't unplugged. */
+	if (! dev->udev)
+	{
+		retval = -ENODEV;
+		printk("No device or device unplugged (%d)", retval);
+		goto exit;
+	}
+
+	/* Verify that we actually have some data to write. */
+	if (count == 0)
+	{
+		printk("No data to write\n");
+		goto exit;
+	}
+
+	/* We only accept one-byte writes. */
+	if (count != 1)
+	count = 1;
+
+	if (copy_from_user(&cmd, user_buf, count))
+	{
+		retval = -EFAULT;
+		goto exit;
+	}
+
+	memset(&buf, 0, sizeof(buf));
+	buf[0] = cmd;
+
+	/* The interrupt-in-endpoint handler also modifies dev->command. */
+	spin_lock(&dev->cmd_spinlock);
+	dev->command = cmd;
+	spin_unlock(&dev->cmd_spinlock);
+
+	/* FixMe: Pretty sure this is going to the wrong endpoint
+	 * int usb_control_msg (struct usb_device * dev, unsigned int pipe,
+	 * __u8 request, __u8 requesttype, __u16 value, __u16 index, void * data,
+	 * __u16 size, int timeout); */
+	retval = usb_control_msg(dev->udev,
+			usb_sndctrlpipe(dev->udev, 0),
+			PIO_CTRL_REQUEST,
+			PIO_CTRL_REQEUST_TYPE,
+			PIO_CTRL_VALUE,
+			PIO_CTRL_INDEX,
+			&buf,
+			sizeof(buf),
+			10000);
+
+	if (retval < 0)
+	{
+		printk("usb_control_msg failed (%d)", retval);
+		goto exit;
+	}
+
+	/* We should have written only one byte. */
+	retval = count;
+
+	exit:
+	return retval;
 }
 /* *****************************************************************
  *
@@ -258,7 +311,8 @@ static struct urb* initialise_urb(int* urb_err)
  *
  *
  * *****************************************************************/
-static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id)
+static int pio_probe(struct usb_interface *interface,
+		const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct usb_pio *dev = NULL;
@@ -362,11 +416,9 @@ static int pio_probe(struct usb_interface *interface, const struct usb_device_id
 	/* We can register the device now, as it is ready */
 	retval = usb_register_dev(interface, &pio_class); //cdc-acm driver dones't think we need this
 
-	exit:
-		return retval;
-	error:
-		pio_delete(dev);
-		return retval;
+	exit: return retval;
+	error: pio_delete(dev);
+	return retval;
 
 }
 /* *****************************************************************
@@ -429,8 +481,8 @@ static void __exit usb_pio_exit(void)
 	usb_deregister(&usb_pio_driver);
 }
 
-module_init(usb_pio_init);
-module_exit(usb_pio_exit);
+module_init( usb_pio_init);
+module_exit( usb_pio_exit);
 
 MODULE_AUTHOR("Matt Hall, Luke Hart, Joe Ellis, Jake Baker, Seb Beaven, Adam Tyndale");
 MODULE_LICENSE("GPL");
