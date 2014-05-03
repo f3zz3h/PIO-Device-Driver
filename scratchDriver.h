@@ -47,8 +47,9 @@ static struct usb_device_id pio_id_table[] =
 };
 struct usb_pio
 {
-	struct usb_device *udev; //the usb_device
-	struct usb_interface *control_interface; //control interface - a signle INT endpoint
+  struct usb_device *udev; //the control usb_device
+  struct usb_device *data_dev; //the data usb device
+  struct usb_interface *control_interface; //control interface - a signle INT endpoint
 	struct usb_interface *data_interface; //data interface - holds rx and tx lines
 	unsigned char minor; //minor number for /proc/dev
 	char unsigned serial_number[8]; //number that comes with the device
@@ -62,7 +63,7 @@ struct usb_pio
 	struct urb *int_in_urb; //ctrl urb
 	int int_in_running; //??
 
-	//rx
+	//tx
 	char *bulk_in_buffer;
 	struct usb_endpoint_descriptor *bulk_in_endpoint;
 	struct urb *bulk_in_urb;

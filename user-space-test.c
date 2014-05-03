@@ -19,15 +19,18 @@ int main(void)
 	int ret = 1;
 	driverFp = fopen("/dev/pio0", "r+");
 	printf("OPENING DRIVER!!\n");
+	getchar();
 	if (driverFp)
 	{
 		printf("WRITING\n");
-		ret = fwrite("a", 1, sizeof("a"), driverFp);
+		ret = fwrite("@00P2FF\r", 8, sizeof("@00P2FF\r"), driverFp);
 		printf("write ret val = %d error num = %d err: %s\n", ret, errno,
 				strerror(errno));
+		getchar();
 		// ret = ioctl(driverFp, ret, ret);
 		//printf("ioctl ret val = %d error num = %d err: %s\n", ret, errno, strerror(errno));
 	}
-	fclose(driverFp);
+	
+		fclose(driverFp);
 	printf("Close DRIVERS!!\n");
 }
