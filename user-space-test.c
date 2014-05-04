@@ -8,6 +8,8 @@
 #include <error.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
 
 /* *****************************************************************
  *
@@ -17,20 +19,30 @@ int main(void)
 {
 	FILE* driverFp;
 	int ret = 1;
-	driverFp = fopen("/dev/pio0", "r+");
+	char* message = "hello";
+	driverFp = open("/dev/pio0", O_RDWR);
 	printf("OPENING DRIVER!!\n");
+	
 	getchar();
 	if (driverFp)
 	{
-		printf("WRITING\n");
-		ret = fwrite("@00P2FF\r", 8, sizeof("@00P2FF\r"), driverFp);
-		printf("write ret val = %d error num = %d err: %s\n", ret, errno,
-				strerror(errno));
-		getchar();
-		// ret = ioctl(driverFp, ret, ret);
-		//printf("ioctl ret val = %d error num = %d err: %s\n", ret, errno, strerror(errno));
+	  printf("WRITING\n");
+	  /*
+	  ret = write("@00P2FF\r", 8, sizeof("@00P2FF\r"), driverFp);
+	  printf("write ret val = %d error num = %d err: %s\n", ret, errno,
+		 strerror(errno));
+	  getchar();
+	  
+	  ret = write("@00P2FC\r", 8, sizeof("@00P2FC\r"), driverFp);
+	  printf("write ret val = %d error num = %d err: %s\n", ret, errno,
+		 strerror(errno));
+	  getchar();
+	  */
+	  ret = ioctl((int)driverFp, ret,(unsigned long) message );
+	  printf("ioctl ret val = %d error num = %d err: %s\n", ret, errno, strerror(errno));
+	  getchar();
 	}
 	
-		fclose(driverFp);
+	close(driverFp);
 	printf("Close DRIVERS!!\n");
 }

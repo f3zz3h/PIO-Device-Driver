@@ -10,7 +10,7 @@ static struct file_operations pio_fops =
 		.write = pio_write,
 		.open = pio_open,
 		.release = 	pio_release,
-		//.unlocked_ioctl = pio_ioctl,
+		.unlocked_ioctl = pio_ioctl
 };
 
 static struct usb_class_driver pio_class =
@@ -111,7 +111,7 @@ static void pio_int_in_callback(struct urb *urb)
  *
  *
  * *****************************************************************/
-static long pio_ioctl(struct file *file, unsigned int cmd, unsigned long int arg)
+static long pio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 
 	switch (cmd)
