@@ -65,6 +65,10 @@ struct usb_pio
 
 	//tx
 	char *bulk_in_buffer;
+  char *bulk_in_ptr;
+  unsigned int read_ready;
+  unsigned int read_lock;
+  spinlock_t bulk_in_lock;
 	struct usb_endpoint_descriptor *bulk_in_endpoint;
 	struct urb *bulk_in_urb;
 	int bulk_in_running;
@@ -98,6 +102,7 @@ static long pio_ioctl(struct file *file, unsigned int cmd, unsigned long int arg
 static int pio_open(struct inode *inode, struct file *file);
 static int pio_release(struct inode *inode, struct file *file);
 static ssize_t pio_write (struct file *file, const char __user *user_buf, size_t count, loff_t *ppos);
+static ssize_t pio_read (struct file *file, const char __user *user_buf, size_t count, loff_t *f_pos);
 static struct urb* initialise_urb(int* urb_err);
 static int pio_probe(struct usb_interface *interface, const struct usb_device_id *id);
 static void pio_disconnect(struct usb_interface *interface);
