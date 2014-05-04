@@ -132,107 +132,45 @@ static long pio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
  * *****************************************************************/
 static int pio_open(struct inode *inode, struct file *file)
 {
-	struct usb_pio *dev = NULL;
-	struct usb_interface *interface;
-	int subminor, len;
-	int retval = 0;
-	char buffer[8] = { '@', '0', '0', 'D', '0', '0', '0', '\r' };
-	char buffer2[8] ={ '@', '0', '0', 'D', '1', 'F', 'F', '\r' };
-	char buffer3[8] = { '@', '0', '0', 'D', '2', '0', '0', '\r' };
-	char buffer4[8] = { '@', '0', '0', 'P', '0', '0', '1', '\r' };
-	char buffer5[8] = { '@', '0', '0', 'P', '2', '3', 'F', '\r' };
-	int i;
-	printk("---Entering Open---");
-	subminor = iminor(inode);	
-	//mutex_lock(&disconnect_mutex);
-	interface = usb_find_interface(&usb_pio_driver, subminor);
-	printk(KERN_INFO KBUILD_MODNAME " Checking Global Dev!\n");
-	if (global_dev == NULL)
-	{
-		printk(KERN_INFO KBUILD_MODNAME " global_dev == NULL!\n");
-		retval = -ENODEV;
-		goto exit;
-	}
-	dev = usb_get_intfdata(interface);
-	if (dev == NULL)
-	{
-		printk(KERN_INFO KBUILD_MODNAME "dev == NULL");
-		retval = -ENODEV;
-		goto exit;
-	}
-	if (dev->data_dev == NULL)
-	  {
-	    	printk(KERN_INFO KBUILD_MODNAME "data_dev == NULL");
-		retval = -ENODEV;
-		goto exit;
-	  }
-	for (i = 0; i < 7; i++)
-	{
-		dev->bulk_out_buffer[i] = buffer[i];
-		//printk("%c\n", dev->bulk_in_buffer[i]);
-	}
-	
-	len = strlen(dev->bulk_out_buffer);
-	printk ("--- buffer length = %d\n", len); 
-	usb_bulk_msg(dev->udev, 
-		     usb_sndbulkpipe(dev->udev, dev->bulk_out_endpoint->bEndpointAddress),
-		     buffer,
-		     8,
-		     &len,
-		     10000);
-
-	usb_bulk_msg(dev->udev,
-		     usb_sndbulkpipe(dev->udev, dev->bulk_out_endpoint->bEndpointAddress),
-		     buffer2,
-		     min(sizeof(dev->bulk_out_buffer), 8),
-		     &len,
-		     10000);
-
-	usb_bulk_msg(dev->udev,
-		     usb_sndbulkpipe(dev->udev, dev->bulk_out_endpoint->bEndpointAddress),
-		     buffer3,
-		     min(sizeof(dev->bulk_out_buffer), 8),
-		     &len,
-		     10000);
-
-	usb_bulk_msg(dev->udev,
-		     usb_sndbulkpipe(dev->udev, dev->bulk_out_endpoint->bEndpointAddress),
-		     buffer4,
-		     min(sizeof(dev->bulk_out_buffer), 8),
-		     &len,
-		     10000);
-	/*
-	usb_bulk_msg(dev->udev,
-		     usb_sndbulkpipe(dev->udev, dev->bulk_out_endpoint->bEndpointAddress),
-		     buffer5,
-		     min(sizeof(dev->bulk_out_buffer), 8),
-		     &len,
-		     10000);
-	*/
-	
-	printk("buffer string %s\n", dev->bulk_out_buffer);
-
-	dev->int_in_running = 1;
-
-	printk(KERN_INFO KBUILD_MODNAME " Submitting init urb\n");
-	/*	
-	if (retval = usb_submit_urb(dev->bulk_out_urb, GFP_KERNEL))
-	{
-	  printk(KERN_INFO KBUILD_MODNAME "failed to submit init urb err no %x\n",dev->bulk_out_endpoint->bEndpointAddress );
-		goto unlock_exit;
-	}
-	*/
-	// Save our object in the file's private structure.
-	file->private_data = dev;
-
-	//usb_autopm_put_interface(dev->control_interface);
-	printk(KERN_INFO KBUILD_MODNAME"------- I'm open minor number %d-------\n", subminor);
-
-	unlock_exit:
-	//up(&dev->sem);
-	exit:
-	//mutex_unlock(&disconnect_mutex);
-	return retval;
+  struct usb_pio *dev = NULL;
+  struct usb_interface *interface;
+  int subminor, len;
+  int retval = 0;
+  int i;
+  printk("---Entering Open---");
+  subminor = iminor(inode);	
+  //mutex_lock(&disconnect_mutex);
+  interface = usb_find_interface(&usb_pio_driver, subminor);
+  printk(KERN_INFO KBUILD_MODNAME " Checking Global Dev!\n");
+  if (global_dev == NULL)
+    {
+      printk(KERN_INFO KBUILD_MODNAME " global_dev == NULL!\n");
+      retval = -ENODEV;
+      goto exit;
+    }
+  dev = usb_get_intfdata(interface);
+  if (dev == NULL)
+    {
+      printk(KERN_INFO KBUILD_MODNAME "dev == NULL");
+      retval = -ENODEV;
+      goto exit;
+    }
+  if (dev->data_dev == NULL)
+    {
+      printk(KERN_INFO KBUILD_MODNAME "data_dev == NULL");
+      retval = -ENODEV;
+      goto exit;
+    }
+  
+  printk(KERN_INFO KBUILD_MODNAME " Submitting init urb\n");
+  
+  // Save our object in the file's private structure.
+  file->private_data = dev;
+    
+  printk(KERN_INFO KBUILD_MODNAME"------- I'm open minor number %d-------\n", subminor);
+  
+ exit://mutex_unlock(&disconnect_mutex);
+  return retval;
 }
 /* *****************************************************************
  *
