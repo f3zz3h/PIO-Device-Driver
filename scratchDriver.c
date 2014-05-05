@@ -300,12 +300,19 @@ static ssize_t pio_read (struct file *file, const char __user *user_buf, size_t 
 			10000);
 
   /*We need to replace the \r to create a readable string*/
-  buffer_in = kmalloc(sizeof(char)*len, GFP_KERNEL);
-  memcpy(buffer_in, dev->bulk_in_buffer, len);
-  buffer_in[len-1] = '\0';
-  
-  /* if the read was successful, copy the data to userspace */
   if (retval == 0) {
+    if(len > 0) 
+      {
+      buffer_in = kmalloc(sizeof(char)*len, GFP_KERNEL);
+      memcpy(buffer_in, dev->bulk_in_buffer, len);
+      buffer_in[len-1] = '\0';
+      }
+    else 
+      {
+	retval = -EFAULT;
+      }
+  /* if the read was successful, copy the data to userspace */
+ 
     if (copy_to_user(user_buf, buffer_in, len))
       retval = -EFAULT;
     else
