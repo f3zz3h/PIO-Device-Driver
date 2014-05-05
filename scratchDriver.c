@@ -8,6 +8,7 @@ static struct file_operations pio_fops =
 {
 		.owner = THIS_MODULE,
 		.write = pio_write,
+		.read = pio_read,
 		.open = pio_open,
 		.release = 	pio_release,
 		.unlocked_ioctl = pio_ioctl
@@ -239,8 +240,6 @@ static ssize_t pio_write (struct file *file, const char __user *user_buf, size_t
 		retval = -EFAULT;
 		goto exit;
 	}
-
-
 	/* The interrupt-in-endpoint handler also modifies dev->command. */
 	//	spin_lock(&dev->cmd_spinlock);
 	//dev->command = cmd;
@@ -277,6 +276,79 @@ static ssize_t pio_write (struct file *file, const char __user *user_buf, size_t
 	exit:
 	return retval;
 }
+static ssize_t pio_read (struct file *file, const char __user *user_buf, size_t count, loff_t *f_pos)
+{
+  struct usb_pio *dev;
+  int retval = 0, len, i;
+  char *buffer_in;
+  
+  dev = file->private_data;
+  
+  /* Verify that the device wasn't unplugged. */
+  if (! dev->udev)
+    {
+      retval = -ENODEV;
+      printk("No device or device unplugged (%d)", retval);
+      return retval;
+    }
+
+  retval = usb_bulk_msg(dev->udev,
+			usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpoint->bEndpointAddress),
+			dev->bulk_in_buffer,
+			min(sizeof(dev->bulk_in_buffer), count),
+			&len, 
+			10000);
+
+  /*We need to replace the \r to create a readable string*/
+  buffer_in = kmalloc(sizeof(char)*len, GFP_KERNEL);
+  memcpy(buffer_in, dev->bulk_in_buffer, len);
+  buffer_in[len-1] = '\0';
+  
+  /* if the read was successful, copy the data to userspace */
+  if (retval == 0) {
+    if (copy_to_user(user_buf, buffer_in, len))
+      retval = -EFAULT;
+    else
+      retval = count;
+  }
+
+  kfree(buffer_in);
+  return retval;
+/*if (! dev->udev)
+	{
+		retval = -ENODEV;
+		printk("No device or device unplugged (%d)", retval);
+		return retval;
+	}
+  if (file->f_flags & O_NONBLOCK)
+  {
+      return -EAGAIN;
+  }
+
+  spin_lock_irq(&dev->bulk_in_lock);
+  len = dev->bulk_in_ptr - dev->bulk_in_buffer;
+  if(len > count)
+    {
+      len = count;
+    }
+
+  if (dev->bulk_in_buffer + len == dev->bulk_in_ptr)
+    {
+      dev->bulk_in_ptr = dev->bulk_in_buffer;
+    }
+  else
+    {
+      for (i = 0; i < dev->bulk_in_ptr - dev->bulk_in_buffer - len; i++)
+	{
+	  dev->bulk_in_buffer[i] = dev->bulk_in_buffer[i + len];
+	}
+      dev->bulk_in_ptr = dev->bulk_in_buffer + len;
+    }
+  dev->read_ready = 0;
+  spin_unlock_irq(&dev->bulk_in_lock);
+  return len;
+*/	
+}
 /* *****************************************************************
  *
  *
@@ -291,6 +363,8 @@ static struct urb* initialise_urb(int* urb_err)
 	return init_urb;
 
 }
+
+
 /* *****************************************************************
  *
  *
