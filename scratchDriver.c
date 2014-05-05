@@ -280,9 +280,18 @@ static ssize_t pio_read (struct file *file, const char __user *user_buf, size_t 
 {
   struct usb_pio *dev;
   int retval = 0, len, i;
+  char *buffer_in;
   
   dev = file->private_data;
   
+  /* Verify that the device wasn't unplugged. */
+  if (! dev->udev)
+    {
+      retval = -ENODEV;
+      printk("No device or device unplugged (%d)", retval);
+      return retval;
+    }
+
   retval = usb_bulk_msg(dev->udev,
 			usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpoint->bEndpointAddress),
 			dev->bulk_in_buffer,
@@ -290,16 +299,21 @@ static ssize_t pio_read (struct file *file, const char __user *user_buf, size_t 
 			&len, 
 			10000);
 
+  /*We need to replace the \r to create a readable string*/
+  buffer_in = kmalloc(sizeof(char)*len, GFP_KERNEL);
+  memcpy(buffer_in, dev->bulk_in_buffer, len);
+  buffer_in[len-1] = '\0';
   
-/* if the read was successful, copy the data to userspace */
-if (retval == 0) {
-  if (copy_to_user(user_buf, dev->bulk_in_buffer, len))
-    retval = -EFAULT;
-  else
-    retval = count;
-}
+  /* if the read was successful, copy the data to userspace */
+  if (retval == 0) {
+    if (copy_to_user(user_buf, buffer_in, len))
+      retval = -EFAULT;
+    else
+      retval = count;
+  }
 
-return retval;
+  kfree(buffer_in);
+  return retval;
 /*if (! dev->udev)
 	{
 		retval = -ENODEV;
