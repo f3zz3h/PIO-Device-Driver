@@ -302,8 +302,6 @@ static ssize_t pio_write (struct file *file, const char __user *user_buf, size_t
 		retval = -EFAULT;
 		goto exit;
 	}
-
-
 	/* The interrupt-in-endpoint handler also modifies dev->command. */
 	//	spin_lock(&dev->cmd_spinlock);
 	//dev->command = cmd;
@@ -346,8 +344,25 @@ static ssize_t pio_read (struct file *file, const char __user *user_buf, size_t 
   int retval = 0, len, i;
   
   dev = file->private_data;
-    
-    if (! dev->udev)
+  
+  retval = usb_bulk_msg(dev->udev,
+			usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpoint->bEndpointAddress),
+			dev->bulk_in_buffer,
+			min(sizeof(dev->bulk_in_buffer), count),
+			&len, 
+			10000);
+
+  
+/* if the read was successful, copy the data to userspace */
+if (retval == 0) {
+  if (copy_to_user(user_buf, dev->bulk_in_buffer, len))
+    retval = -EFAULT;
+  else
+    retval = count;
+}
+
+return retval;
+/*if (! dev->udev)
 	{
 		retval = -ENODEV;
 		printk("No device or device unplugged (%d)", retval);
@@ -380,7 +395,7 @@ static ssize_t pio_read (struct file *file, const char __user *user_buf, size_t 
   dev->read_ready = 0;
   spin_unlock_irq(&dev->bulk_in_lock);
   return len;
-	
+*/	
 }
 /* *****************************************************************
  *
