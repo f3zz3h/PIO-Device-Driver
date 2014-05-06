@@ -18,3 +18,12 @@
 #define DISPLAY_D "@00P25E\r"
 #define DISPLAY_E "@00P279\r"
 #define DISPLAY_F "@00P271\r"
+
+#define CHECK_BUTTON "@00P1?\r"
+const char keypadMapping[4][4] =  {{ '1' , '2' , '3' , 'A' },
+						{ '4', '5' , '6' , 'B' },
+						{ '7' , '8', '9' , 'C' },
+						{ 'D', '0' , 'E', 'F' }};
+
+#define TRUE 1
+#define FALSE 0
